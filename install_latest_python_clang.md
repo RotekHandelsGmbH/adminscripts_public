@@ -61,9 +61,14 @@ After installation:
   /opt/python-latest/bin/python3 --version
   ```
 
-- **Creating virtual environments** (always use versioned):
+- **Creating virtual environments** (always use versioned).  
+  virtual environments might brake if You create them from `/opt/python-latest` if that gets updated 
   ```bash
+  # venv
   /opt/python-<version>/bin/python3 -m venv myenv
+  # virtualenv
+  /opt/python-<version>/bin/python3 -m virtualenv myenv
+  # check out the key differences between venv and virtualenv
   ```
 
 ## Configuration
