@@ -18,4 +18,4 @@ git clone --depth 1 https://github.com/RotekHandelsGmbH/adminscripts.git
 
 
 
-- [install latest python with clang compiler](./readme_install_latest_python_clang.md)
+- [install latest python from source on linux with clang compiler](./readme_install_latest_python_clang.md)
