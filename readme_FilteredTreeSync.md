@@ -14,6 +14,7 @@
 - **Verifies** every copied file for integrity
 - Optionally **deletes the source files** only after successful verification
 - Has a **dry-run** mode to simulate the entire process without modifying anything
+- Supports **auto-confirm** mode to skip manual confirmation prompts
 - Provides **colorful**, clean console output with real-time progress bars
 
 ---
@@ -26,6 +27,7 @@
 - ✨ Real-time progress bars for copy and verification
 - ✨ Optional source deletion after successful copy and verify
 - ✨ Dry-run simulation mode to preview operations safely
+- ✨ Auto-confirm mode to skip manual keypress confirmation
 - ✨ Strict bash error handling (`set -euo pipefail`)
 - ✨ Clear and colorful terminal output
 
@@ -46,36 +48,48 @@ Place it somewhere in your `PATH` if you want global access, e.g., `/usr/local/b
 ## 📚 Usage
 
 ```bash
-./FilteredTreeSync.sh <source_directory> <destination_directory> <file_pattern> [--deletesources] [--dry-run]
+./FilteredTreeSync.sh <source_directory> <destination_directory> <file_pattern> [--deletesources] [--dry-run] [--autoconfirm]
 ```
 
 ### Parameters:
+
 - `source_directory` : Directory to search for files
 - `destination_directory` : Directory where files will be copied
 - `file_pattern` : Pattern to match files (e.g., `"*.pdf"`, `"*.docx"`)
 - `--deletesources` (optional) : Deletes the source files **after** successful copy and verification
 - `--dry-run` (optional) : Simulates the entire operation without actually copying or deleting files
+- `--autoconfirm` (optional) : Skips keypress confirmation after summary and proceeds automatically
 
 ### Examples:
 
 **Simple copy with structure preservation:**
+
 ```bash
 ./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf"
 ```
 
 **Copy and delete source files after successful verification:**
+
 ```bash
 ./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --deletesources
 ```
 
 **Dry-run (simulate operations only):**
+
 ```bash
 ./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --dry-run
 ```
 
-**Dry-run with delete simulation:**
+**Dry-run with auto-confirm:**
+
 ```bash
-./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --deletesources --dry-run
+./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --dry-run --autoconfirm
+```
+
+**Dry-run with delete simulation and auto-confirm:**
+
+```bash
+./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --deletesources --dry-run --autoconfirm
 ```
 
 ---

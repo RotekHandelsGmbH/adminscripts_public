@@ -4,15 +4,9 @@
 #
 #  🌳 Selective Tree-Based File Synchronization Script
 #
-#  Author: Robert Nowotny
-#  Version: 1.3
+#  Author: bitranox
+#  Version: 1.4
 #  License: MIT
-#
-#  Description:
-#    FilteredTreeSync copies files matching a specific pattern from a source
-#    directory to a destination directory, preserving the entire folder structure.
-#    It supports parallel copying, real-time progress bars, verification after copy,
-#    optional deletion of source files, dry-run simulation, and colorful console output.
 #
 # ==============================================================================
 
@@ -46,7 +40,7 @@ echo -e "${NC}"
 
 # Argument Parsing
 if [[ $# -lt 3 ]]; then
-    echo -e "${RED}$ERROR Usage: $0 <source_directory> <destination_directory> <file_pattern> [--deletesources] [--dry-run]${NC}"
+    echo -e "${RED}$ERROR Usage: $0 <source_directory> <destination_directory> <file_pattern> [--deletesources] [--dry-run] [--autoconfirm]${NC}"
     exit 1
 fi
 
@@ -55,6 +49,7 @@ DEST_DIR="$2"
 PATTERN="$3"
 DELETE_SOURCES=false
 DRY_RUN=false
+AUTOCONFIRM=false
 
 shift 3
 while [[ $# -gt 0 ]]; do
@@ -65,6 +60,9 @@ while [[ $# -gt 0 ]]; do
         --dry-run)
             DRY_RUN=true
             ;;
+        --autoconfirm)
+            AUTOCONFIRM=true
+            ;;
         *)
             echo -e "${RED}$ERROR Unknown option: $1${NC}"
             exit 1
@@ -73,11 +71,10 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-# Auto-correct pattern if needed
-if [[ ! "$PATTERN" == *"*"* && ! "$PATTERN" == *"?"* && ! "$PATTERN" == *"["* ]]; then
-    echo -e "${YELLOW}$WARN Detected unquoted or incorrectly expanded pattern. Attempting auto-correction.${NC}"
-    PATTERN="*$PATTERN*"
-    echo -e "${BLUE}$INFO Using corrected pattern: \"$PATTERN\"${NC}"
+# Detect if file pattern was expanded incorrectly
+if [[ ! "$PATTERN" == *"*"* && ! "$PATTERN" == *"?"* && ! "$PATTERN" == *"["* && ! "$PATTERN" == *"]"* ]]; then
+    echo -e "${YELLOW}$WARN Warning: File pattern \"$PATTERN\" appears to have been expanded prematurely. Did you forget to quote it?${NC}"
+    echo -e "${YELLOW}$WARN Continuing anyway with provided value.${NC}"
 fi
 
 # Show a quick summary
@@ -87,7 +84,16 @@ echo -e "${BLUE}  Destination Directory: ${NC}$DEST_DIR"
 echo -e "${BLUE}  File Pattern:           ${NC}\"$PATTERN\""
 echo -e "${BLUE}  Dry-run Mode:           ${NC}${DRY_RUN}"
 echo -e "${BLUE}  Delete Sources:         ${NC}${DELETE_SOURCES}"
+echo -e "${BLUE}  Auto-confirm:           ${NC}${AUTOCONFIRM}"
 echo
+
+# Pause unless --autoconfirm
+if [[ "$AUTOCONFIRM" == false ]]; then
+    read -n 1 -s -r -p $'\nPress any key to continue...\n'
+    echo
+else
+    echo -e "${BLUE}$INFO Auto-confirm enabled: continuing immediately...${NC}"
+fi
 
 # Find files
 echo -e "${BLUE}$INFO Searching for files matching \"$PATTERN\" in \"$SRC_DIR\"...${NC}"
@@ -110,9 +116,15 @@ draw_progress_bar() {
     local total=$2
     local width=$3
 
-    local percent=$(( progress * 100 / total ))
-    local filled=$(( progress * width / total ))
-    local empty=$(( width - filled ))
+    if [[ $total -eq 0 ]]; then
+        percent=100
+        filled=$width
+        empty=0
+    else
+        percent=$(( progress * 100 / total ))
+        filled=$(( progress * width / total ))
+        empty=$(( width - filled ))
+    fi
 
     printf "\r["
     printf "%0.s#" $(seq 1 $filled)
@@ -120,13 +132,13 @@ draw_progress_bar() {
     printf "] %d%% (%d/%d)" "$percent" "$progress" "$total"
 }
 
+export -f draw_progress_bar
+
 # --- Copy Files ---
 echo -e "${CYAN}$COPY Starting ${DRY_RUN:+(dry-run) }copy...${NC}"
 
 COPIED=0
-
 export SRC_DIR DEST_DIR DRY_RUN
-export -f draw_progress_bar
 
 copy_file() {
     local FILE="$1"
