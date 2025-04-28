@@ -14,30 +14,12 @@
 #    It supports parallel copying, real-time progress bars, verification after copy,
 #    optional deletion of source files, dry-run simulation, and colorful console output.
 #
-#  Features:
-#    - File pattern filtering (e.g., "*.pdf", "*.docx", "*.jpg", etc.)
-#    - Full directory tree preservation
-#    - Fast parallel file copying (multi-threaded)
-#    - Real-time progress display
-#    - File integrity verification after copy
-#    - Optional deletion of source files after successful verification
-#    - Dry-run simulation mode
-#    - Clear colored status messages and helpful logs
-#
-#  Usage:
-#    ./FilteredTreeSync.sh <source_directory> <destination_directory> <file_pattern> [--deletesources] [--dry-run]
-#
-#  Example:
-#    ./FilteredTreeSync.sh /home/projects /backup/projects "*.pdf"
-#    ./FilteredTreeSync.sh /home/projects /backup/projects "*.pdf" --deletesources
-#    ./FilteredTreeSync.sh /home/projects /backup/projects "*.pdf" --dry-run
-#
 # ==============================================================================
 
-# Strict mode: safer scripting
+# Strict mode
 set -euo pipefail
 
-# Display logo
+# Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
@@ -45,23 +27,29 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-echo -e "${GREEN}"
-echo "    🌳  FilteredTreeSync"
-echo "      /\\"
-echo "     /  \\    Copy + Filter + Preserve"
-echo "    /____\\"
-echo -e "${NC}"
-
 # Emojis
-INFO="ℹ️ "
+INFO="🔹"
 OK="✅"
 ERROR="❌"
 WARN="⚠️"
 COPY="📂"
 CHECK="🔍"
-DELETE="🗑️ "
+DELETE="🗑️"
 
-# Parse arguments
+# Logo
+echo -e "${GREEN}"
+echo "    🌳  FilteredTreeSync"
+echo "      /\\"
+echo "     /  \\    Filter + Copy + Preserve Directory Structure"
+echo "    /____\\"
+echo -e "${NC}"
+
+# Argument Parsing
+if [[ $# -lt 3 ]]; then
+    echo -e "${RED}$ERROR Usage: $0 <source_directory> <destination_directory> <file_pattern> [--deletesources] [--dry-run]${NC}"
+    exit 1
+fi
+
 SRC_DIR="$1"
 DEST_DIR="$2"
 PATTERN="$3"
@@ -85,13 +73,13 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-# Find matching files
-echo -e "${BLUE}$INFO Searching for files matching pattern \"$PATTERN\" in \"$SRC_DIR\"...${NC}"
+# Find files
+echo -e "${BLUE}$INFO Searching for files matching \"$PATTERN\" in \"$SRC_DIR\"...${NC}"
 mapfile -t FILES < <(find "$SRC_DIR" -type f -iname "$PATTERN")
 
 TOTAL=${#FILES[@]}
 if [[ $TOTAL -eq 0 ]]; then
-    echo -e "${YELLOW}$WARN No files found matching pattern \"$PATTERN\".${NC}"
+    echo -e "${YELLOW}$WARN No matching files found.${NC}"
     exit 0
 fi
 
@@ -148,7 +136,7 @@ echo
 echo -e "${GREEN}$OK Copying complete.${NC}"
 echo
 
-# --- Verification ---
+# --- Verify Files ---
 echo -e "${CYAN}$CHECK Verifying copied files...${NC}"
 
 VERIFIED=0
@@ -178,26 +166,34 @@ printf "%s\n" "${FILES[@]}" | xargs -n 1 -P 4 -I {} bash -c 'verify_file "$@"' _
 
 echo
 
-# --- Deletion ---
+# --- Deletion Logic ---
 if [[ "$DRY_RUN" == false ]]; then
     if [[ $ERRORS -eq 0 ]]; then
         echo -e "${GREEN}$OK Verification successful: All files copied correctly.${NC}"
 
         if [[ "$DELETE_SOURCES" == true ]]; then
             echo -e "${RED}$DELETE Deleting source files...${NC}"
-
             for FILE in "${FILES[@]}"; do
                 rm -f "$FILE"
             done
-
             echo -e "${GREEN}$OK Source files deleted successfully.${NC}"
         fi
     else
         echo -e "${RED}$ERROR Verification failed: $ERRORS file(s) mismatched.${NC}"
-        echo -e "${YELLOW}$WARN Skipping deletion of source files due to errors.${NC}"
+        echo -e "${YELLOW}$WARN Skipping deletion of source files.${NC}"
     fi
 else
-    echo -e "${BLUE}$INFO Dry-run completed: no files were copied or deleted.${NC}"
+    if [[ "$DELETE_SOURCES" == true ]]; then
+        echo -e "${YELLOW}$WARN Would delete the following files after successful verification:${NC}"
+        for FILE in "${FILES[@]}"; do
+            echo -e "${YELLOW}Would delete:${NC} $FILE"
+        done
+        echo
+        echo -e "${BLUE}$INFO Dry-run completed: no files were copied; source files would have been deleted.${NC}"
+    else
+        echo
+        echo -e "${BLUE}$INFO Dry-run completed: no files were copied or deleted.${NC}"
+    fi
 fi
 
 echo

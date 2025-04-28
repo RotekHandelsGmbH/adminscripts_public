@@ -93,7 +93,7 @@ Place it somewhere in your `PATH` if you want global access, e.g., `/usr/local/b
 ```bash
     🌳  FilteredTreeSync
       /\
-     /  \    Copy + Filter + Preserve
+     /  \    Filter + Copy + Preserve Directory Structure
     /____\
 
 🔹 Searching for files matching pattern "*.pdf" in "/home/user/docs"...
@@ -106,6 +106,13 @@ Place it somewhere in your `PATH` if you want global access, e.g., `/usr/local/b
 🔹 Verifying copied files...
 [##############################] 100% (125/125)
 🔹 Verification successful: All files copied correctly.
+
+🔹 Would delete the following files after successful verification:
+Would delete: /home/user/docs/report1.pdf
+Would delete: /home/user/docs/summary2.pdf
+Would delete: /home/user/docs/final3.pdf
+
+🔹 ✨ Dry-run completed: no files were copied; source files would have been deleted.
 
 🔹 Done.
 ```
