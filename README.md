@@ -15,7 +15,5 @@ git clone --depth 1 https://github.com/RotekHandelsGmbH/adminscripts.git
 
 ## scripts
 
-
-
-
 - [install latest python from source on linux with clang compiler](./readme_install_latest_python_clang.md)
+- [FilteredTreeSync - Selectively copies files matching a specific pattern, preserving the full directory tree structure](./readme_FilteredTreeSync.md)
