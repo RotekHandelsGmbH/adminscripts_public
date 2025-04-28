@@ -5,12 +5,11 @@
 #  🌳 Selective Tree-Based File Synchronization Script
 #
 #  Author: bitranox
-#  Version: 1.4
+#  Version: 1.5
 #  License: MIT
 #
 # ==============================================================================
 
-# Strict mode
 set -euo pipefail
 
 # Colors
@@ -71,13 +70,12 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-# Detect if file pattern was expanded incorrectly
+# Detect if file pattern expanded improperly
 if [[ ! "$PATTERN" == *"*"* && ! "$PATTERN" == *"?"* && ! "$PATTERN" == *"["* && ! "$PATTERN" == *"]"* ]]; then
     echo -e "${YELLOW}$WARN Warning: File pattern \"$PATTERN\" appears to have been expanded prematurely. Did you forget to quote it?${NC}"
-    echo -e "${YELLOW}$WARN Continuing anyway with provided value.${NC}"
 fi
 
-# Show a quick summary
+# Show summary
 echo -e "\n${CYAN}🔹 Summary:${NC}"
 echo -e "${BLUE}  Source Directory:      ${NC}$SRC_DIR"
 echo -e "${BLUE}  Destination Directory: ${NC}$DEST_DIR"
@@ -87,7 +85,6 @@ echo -e "${BLUE}  Delete Sources:         ${NC}${DELETE_SOURCES}"
 echo -e "${BLUE}  Auto-confirm:           ${NC}${AUTOCONFIRM}"
 echo
 
-# Pause unless --autoconfirm
 if [[ "$AUTOCONFIRM" == false ]]; then
     read -n 1 -s -r -p $'\nPress any key to continue...\n'
     echo
@@ -97,7 +94,7 @@ fi
 
 # Find files
 echo -e "${BLUE}$INFO Searching for files matching \"$PATTERN\" in \"$SRC_DIR\"...${NC}"
-mapfile -t FILES < <(find "$SRC_DIR" -type f -iname "$PATTERN")
+mapfile -d '' -t FILES < <(find "$SRC_DIR" -type f -iname "$PATTERN" -print0)
 
 TOTAL=${#FILES[@]}
 if [[ $TOTAL -eq 0 ]]; then
@@ -138,7 +135,7 @@ export -f draw_progress_bar
 echo -e "${CYAN}$COPY Starting ${DRY_RUN:+(dry-run) }copy...${NC}"
 
 COPIED=0
-export SRC_DIR DEST_DIR DRY_RUN
+export SRC_DIR DEST_DIR DRY_RUN TOTAL COPIED BAR_WIDTH
 
 copy_file() {
     local FILE="$1"
@@ -158,7 +155,7 @@ copy_file() {
 
 export -f copy_file
 
-printf "%s\n" "${FILES[@]}" | xargs -n 1 -P 4 -I {} bash -c 'copy_file "$@"' _ {}
+printf "%s\0" "${FILES[@]}" | xargs -0 -n 1 -P 4 bash -c 'copy_file "$0"'
 
 echo
 echo -e "${GREEN}$OK Copying complete.${NC}"
@@ -169,6 +166,7 @@ echo -e "${CYAN}$CHECK Verifying copied files...${NC}"
 
 VERIFIED=0
 ERRORS=0
+export VERIFIED ERRORS
 
 verify_file() {
     local FILE="$1"
@@ -190,7 +188,7 @@ verify_file() {
 
 export -f verify_file
 
-printf "%s\n" "${FILES[@]}" | xargs -n 1 -P 4 -I {} bash -c 'verify_file "$@"' _ {}
+printf "%s\0" "${FILES[@]}" | xargs -0 -n 1 -P 4 bash -c 'verify_file "$0"'
 
 echo
 
