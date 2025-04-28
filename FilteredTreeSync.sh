@@ -4,8 +4,8 @@
 #
 #  🌳 Selective Tree-Based File Synchronization Script
 #
-#  Author: bitranox
-#  Version: 1.2
+#  Author: Robert Nowotny
+#  Version: 1.3
 #  License: MIT
 #
 #  Description:
@@ -72,6 +72,22 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+# Auto-correct pattern if needed
+if [[ ! "$PATTERN" == *"*"* && ! "$PATTERN" == *"?"* && ! "$PATTERN" == *"["* ]]; then
+    echo -e "${YELLOW}$WARN Detected unquoted or incorrectly expanded pattern. Attempting auto-correction.${NC}"
+    PATTERN="*$PATTERN*"
+    echo -e "${BLUE}$INFO Using corrected pattern: \"$PATTERN\"${NC}"
+fi
+
+# Show a quick summary
+echo -e "\n${CYAN}🔹 Summary:${NC}"
+echo -e "${BLUE}  Source Directory:      ${NC}$SRC_DIR"
+echo -e "${BLUE}  Destination Directory: ${NC}$DEST_DIR"
+echo -e "${BLUE}  File Pattern:           ${NC}\"$PATTERN\""
+echo -e "${BLUE}  Dry-run Mode:           ${NC}${DRY_RUN}"
+echo -e "${BLUE}  Delete Sources:         ${NC}${DELETE_SOURCES}"
+echo
 
 # Find files
 echo -e "${BLUE}$INFO Searching for files matching \"$PATTERN\" in \"$SRC_DIR\"...${NC}"
