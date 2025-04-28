@@ -5,7 +5,7 @@
 #  🌳 Selective Tree-Based File Synchronization Script
 #
 #  Author: bitranox
-#  Version: 1.5
+#  Version: 1.6
 #  License: MIT
 #
 # ==============================================================================
@@ -92,9 +92,9 @@ else
     echo -e "${BLUE}$INFO Auto-confirm enabled: continuing immediately...${NC}"
 fi
 
-# Find files
+# Find files excluding destination
 echo -e "${BLUE}$INFO Searching for files matching \"$PATTERN\" in \"$SRC_DIR\"...${NC}"
-mapfile -d '' -t FILES < <(find "$SRC_DIR" -type f -iname "$PATTERN" -print0)
+mapfile -d '' -t FILES < <(find "$SRC_DIR" \( -path "$DEST_DIR" -o -path "$DEST_DIR/*" \) -prune -false -o -type f -iname "$PATTERN" -print0)
 
 TOTAL=${#FILES[@]}
 if [[ $TOTAL -eq 0 ]]; then
@@ -200,7 +200,9 @@ if [[ "$DRY_RUN" == false ]]; then
         if [[ "$DELETE_SOURCES" == true ]]; then
             echo -e "${RED}$DELETE Deleting source files...${NC}"
             for FILE in "${FILES[@]}"; do
-                rm -f "$FILE"
+                if [[ "$FILE" != "$DEST_DIR"* ]]; then
+                    rm -f "$FILE"
+                fi
             done
             echo -e "${GREEN}$OK Source files deleted successfully.${NC}"
         fi
@@ -212,7 +214,9 @@ else
     if [[ "$DELETE_SOURCES" == true ]]; then
         echo -e "${YELLOW}$WARN Would delete the following files after successful verification:${NC}"
         for FILE in "${FILES[@]}"; do
-            echo -e "${YELLOW}Would delete:${NC} $FILE"
+            if [[ "$FILE" != "$DEST_DIR"* ]]; then
+                echo -e "${YELLOW}Would delete:${NC} $FILE"
+            fi
         done
         echo
         echo -e "${BLUE}$INFO Dry-run completed: no files were copied; source files would have been deleted.${NC}"

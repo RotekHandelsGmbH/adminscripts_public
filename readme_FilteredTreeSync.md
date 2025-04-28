@@ -15,6 +15,7 @@
 - Optionally **deletes the source files** only after successful verification
 - Has a **dry-run** mode to simulate the entire process without modifying anything
 - Supports **auto-confirm** mode to skip manual confirmation prompts
+- Automatically **excludes destination directories** from search and deletion to avoid accidental overwrites
 - Provides **colorful**, clean console output with real-time progress bars
 
 ---
@@ -28,6 +29,7 @@
 - ✨ Optional source deletion after successful copy and verify
 - ✨ Dry-run simulation mode to preview operations safely
 - ✨ Auto-confirm mode to skip manual keypress confirmation
+- ✨ Automatic exclusion of destination directories
 - ✨ Strict bash error handling (`set -euo pipefail`)
 - ✨ Clear and colorful terminal output
 
@@ -97,6 +99,7 @@ Place it somewhere in your `PATH` if you want global access, e.g., `/usr/local/b
 ## 💡 Tips
 
 - Always run a `--dry-run` first if you're unsure about the source files!
+- Destination directories are automatically excluded from being copied or deleted.
 - You can easily integrate it into cron jobs or backup scripts.
 - Customize parallel job count by adjusting the script (currently 4 jobs in parallel).
 
