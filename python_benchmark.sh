@@ -7,6 +7,9 @@ BASELINE_JSON=$RESULTS_DIR/baseline.json
 RUN_ID=$(date +"%Y%m%d_%H%M%S")
 OUTPUT_JSON=$RESULTS_DIR/run_$RUN_ID.json
 
+rm -rf ./dask-worker-space
+rm -rf ./venv
+
 mkdir -p "$RESULTS_DIR"
 
 echo "Installing pyperformance..."
@@ -24,3 +27,6 @@ else
     echo "No baseline found. To set one:"
     echo "  cp $OUTPUT_JSON $BASELINE_JSON"
 fi
+
+rm -rf ./dask-worker-space
+rm -rf ./venv

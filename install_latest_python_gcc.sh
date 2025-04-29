@@ -105,7 +105,6 @@ function install_prefix() {
     --with-lto \
     --with-openssl=/usr \
     --with-system-zlib \
-    --enable-shared \
     || error "Configure failed for $PREFIX"
 
   log "Building (prefix=$PREFIX)…"
