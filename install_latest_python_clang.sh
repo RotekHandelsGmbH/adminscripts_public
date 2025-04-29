@@ -76,7 +76,7 @@ function prepare_build() {
 set_opt_flags() {
     echo "🔧 This will set HIGH-PERFORMANCE compiler and linker flags:"
     echo ""
-    echo "  CFLAGS    = -O3 -march=native -flto=auto -fno-semantic-interposition"
+    echo "  CFLAGS    = -O2 -march=native -flto=auto -fno-semantic-interposition"
     echo "  CXXFLAGS  = (same as CFLAGS)"
     echo "  LDFLAGS   = -Wl,-O1 -Wl,--as-needed -flto=auto"
     echo ""
@@ -84,7 +84,7 @@ set_opt_flags() {
 
     case "$answer" in
         [yY][eE][sS]|[yY])
-            export CFLAGS="-O3 -march=native -flto=auto -fno-semantic-interposition"
+            export CFLAGS="-O2 -march=native -flto=auto -fno-semantic-interposition"
             export CXXFLAGS="$CFLAGS"
             export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
             echo "✅ Optimization flags set."
