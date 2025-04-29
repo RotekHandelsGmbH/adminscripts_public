@@ -80,7 +80,7 @@ set_opt_flags() {
     echo "  CXXFLAGS  = (same as CFLAGS)"
     echo "  LDFLAGS   = -Wl,-O1 -Wl,--as-needed -flto=auto"
     echo ""
-    read -p "❓ Do you want to apply these flags for your build? [y/N]: " answer
+    read -p "❓ Do you want to apply these flags for your build? You will be able to execute python only at this machines CPU (march=native) [y/N]: " answer
 
     case "$answer" in
         [yY][eE][sS]|[yY])
@@ -104,9 +104,7 @@ function install_prefix() {
   pick_compiler
   cd "$TMP_DIR/cpython-build"
 
-  set_opt_flags
-
-  log "Configuring (prefix=$PREFIX)…"
+    log "Configuring (prefix=$PREFIX)…"
   make clean &>/dev/null || true
   ./configure \
     --prefix="$PREFIX" \
@@ -149,6 +147,7 @@ TAG=$(curl -fsSL \
 PY_VERSION="${TAG#v}"
 debug "Tag: $TAG → version $PY_VERSION"
 
+set_opt_flags
 prepare_build "$TAG"
 install_prefix "/opt/python-${PY_VERSION}"
 install_prefix "$PYTHON_LATEST_DIR"
