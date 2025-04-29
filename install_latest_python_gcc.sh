@@ -99,7 +99,7 @@ function install_prefix() {
   make clean &>/dev/null || true
   make distclean &>/dev/null || true
 
-
+  set_opt_flags
 
   ./configure \
     --prefix="$PREFIX" \
@@ -107,7 +107,7 @@ function install_prefix() {
     --with-lto \
     --with-openssl=/usr \
     --with-system-zlib \
-    --enable-shared
+    --enable-shared \
     || error "Configure failed for $PREFIX"
 
   log "Building (prefix=$PREFIX)…"

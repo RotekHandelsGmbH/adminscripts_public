@@ -72,6 +72,29 @@ function prepare_build() {
   tar -xzf "$ARCHIVE" --strip-components=1 -C cpython-build || error "Extraction failed"
 }
 
+# === SET OPT FLAGS ===
+set_opt_flags() {
+    echo "🔧 This will set HIGH-PERFORMANCE compiler and linker flags:"
+    echo ""
+    echo "  CFLAGS    = -O3 -march=native -flto=auto -fno-semantic-interposition"
+    echo "  CXXFLAGS  = (same as CFLAGS)"
+    echo "  LDFLAGS   = -Wl,-O1 -Wl,--as-needed -flto=auto"
+    echo ""
+    read -p "❓ Do you want to apply these flags for your build? [y/N]: " answer
+
+    case "$answer" in
+        [yY][eE][sS]|[yY])
+            export CFLAGS="-O3 -march=native -flto=auto -fno-semantic-interposition"
+            export CXXFLAGS="$CFLAGS"
+            export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
+            echo "✅ Optimization flags set."
+            ;;
+        *)
+            echo "❌ Optimization flags NOT set. You can still export them manually later."
+            ;;
+    esac
+}
+
 # === BUILD & INSTALL CPYTHON ===
 function install_prefix() {
   local PREFIX="$1"
@@ -86,8 +109,10 @@ function install_prefix() {
   ./configure \
     --prefix="$PREFIX" \
     --enable-optimizations \
+    --with-lto \
     --with-openssl=/usr \
     --with-system-zlib \
+    --enable-shared \
     || error "Configure failed for $PREFIX"
 
   log "Building (prefix=$PREFIX)…"
