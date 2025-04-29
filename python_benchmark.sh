@@ -2,7 +2,7 @@
 
 # Use your specified Python binary
 PYTHON_BINARY=/opt/python-latest/bin/python3
-RESULTS_DIR=./../bench_results
+RESULTS_DIR=./bench_results
 BASELINE_JSON=$RESULTS_DIR/baseline.json
 RUN_ID=$(date +"%Y%m%d_%H%M%S")
 OUTPUT_JSON=$RESULTS_DIR/run_$RUN_ID.json
