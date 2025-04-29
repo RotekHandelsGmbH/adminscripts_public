@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Paths (adjust as needed)
-PYTHON_BINARY=./python
+# Use your specified Python binary
+PYTHON_BINARY=/opt/python-latest/bin/python3
 RESULTS_DIR=./bench_results
 BASELINE_JSON=$RESULTS_DIR/baseline.json
 RUN_ID=$(date +"%Y%m%d_%H%M%S")
