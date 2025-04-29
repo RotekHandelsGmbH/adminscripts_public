@@ -13,7 +13,7 @@ echo "Installing pyperformance..."
 $PYTHON_BINARY -m pip install --upgrade pyperformance > /dev/null
 
 echo "Running pyperformance benchmark..."
-$PYTHON_BINARY -m pyperformance run --quiet --python=$PYTHON_BINARY --output=$OUTPUT_JSON
+$PYTHON_BINARY -m pyperformance run --python=$PYTHON_BINARY --output=$OUTPUT_JSON
 
 echo "✅ Benchmark complete. Results saved to: $OUTPUT_JSON"
 
