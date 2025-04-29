@@ -17,7 +17,7 @@ echo "Running pyperformance 5 times..."
 for i in {1..5}; do
     OUT_FILE=$TMP_RUN_DIR/run_$i.json
     echo "  Run #$i..."
-    $PYTHON_BINARY -m pyperformance run --quiet --python=$PYTHON_BINARY --output=$OUT_FILE
+    $PYTHON_BINARY -m pyperformance run --python=$PYTHON_BINARY --output=$OUT_FILE
 done
 
 echo "Merging runs into average result..."
