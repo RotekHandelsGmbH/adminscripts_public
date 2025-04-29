@@ -16,9 +16,8 @@ log()    { echo -e "\n${CYAN}ℹ️  [INFO]${RESET} $1\n"; }
 debug()  { echo -e "${BLUE}🐞 [DEBUG]${RESET} $1"; }
 warn()   { echo -e "${YELLOW}⚠️ [WARN]${RESET} $1"; }
 success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
-error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
+error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
 fail()   { error "$1"; exit 1; }
-
 
 # === INSTALL REQUIRED TOOLS & DEV LIBS ===
 MISSING_PKGS=()
@@ -27,13 +26,9 @@ for pkg in curl jq wget pkg-config; do
   command -v "$pkg" &>/dev/null || MISSING_PKGS+=("$pkg")
 done
 
-# build‐toolchain
+# build-toolchain
 if ! command -v gcc &>/dev/null || ! command -v make &>/dev/null; then
   MISSING_PKGS+=(build-essential)
-fi
-# prefer clang
-if ! command -v clang &>/dev/null; then
-  MISSING_PKGS+=(clang)
 fi
 
 # SSL and zlib headers
@@ -45,16 +40,12 @@ if [ "${#MISSING_PKGS[@]}" -gt 0 ]; then
   apt-get install -y "${MISSING_PKGS[@]}" || error "Failed to install ${MISSING_PKGS[*]}"
 fi
 
-# === PICK NEWEST COMPILER ===
+# === ENSURE GCC IS USED ===
 function pick_compiler() {
-  local gcc_v=0 clang_v=0
-  if command -v gcc &>/dev/null; then gcc_v=$(gcc -dumpversion | cut -f1 -d.); fi
-  if command -v clang &>/dev/null; then clang_v=$(clang --version | head -n1 | sed -E 's/.*version ([0-9]+).*/\1/'); fi
-  if (( clang_v > gcc_v )); then
-    export CC=clang CXX=clang++
-  else
-    export CC=gcc CXX=g++
+  if ! command -v gcc &>/dev/null; then
+    fail "GCC compiler not found!"
   fi
+  export CC=gcc CXX=g++
   debug "Using compiler: $CC"
 }
 
@@ -72,6 +63,29 @@ function prepare_build() {
   tar -xzf "$ARCHIVE" --strip-components=1 -C cpython-build || error "Extraction failed"
 }
 
+# === SET OPT FLAGS ===
+set_opt_flags() {
+    echo "🔧 This will set HIGH-PERFORMANCE compiler and linker flags:"
+    echo ""
+    echo "  CFLAGS    = -O3 -march=native -flto=auto -fno-semantic-interposition"
+    echo "  CXXFLAGS  = (same as CFLAGS)"
+    echo "  LDFLAGS   = -Wl,-O1 -Wl,--as-needed -flto=auto"
+    echo ""
+    read -p "❓ Do you want to apply these flags for your build? [y/N]: " answer
+
+    case "$answer" in
+        [yY][eE][sS]|[yY])
+            export CFLAGS="-O3 -march=native -flto=auto -fno-semantic-interposition"
+            export CXXFLAGS="$CFLAGS"
+            export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
+            echo "✅ Optimization flags set."
+            ;;
+        *)
+            echo "❌ Optimization flags NOT set. You can still export them manually later."
+            ;;
+    esac
+}
+
 # === BUILD & INSTALL CPYTHON ===
 function install_prefix() {
   local PREFIX="$1"
@@ -83,11 +97,17 @@ function install_prefix() {
 
   log "Configuring (prefix=$PREFIX)…"
   make clean &>/dev/null || true
+  make distclean &>/dev/null || true
+
+
+
   ./configure \
     --prefix="$PREFIX" \
     --enable-optimizations \
+    --with-lto \
     --with-openssl=/usr \
     --with-system-zlib \
+    --enable-shared
     || error "Configure failed for $PREFIX"
 
   log "Building (prefix=$PREFIX)…"
