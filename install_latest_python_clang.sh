@@ -104,6 +104,8 @@ function install_prefix() {
   pick_compiler
   cd "$TMP_DIR/cpython-build"
 
+  set_opt_flags
+
   log "Configuring (prefix=$PREFIX)…"
   make clean &>/dev/null || true
   ./configure \
