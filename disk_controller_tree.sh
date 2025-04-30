@@ -43,14 +43,14 @@ declare -A CONTROLLER_DISKS
 
 get_storage_controller() {
     local devpath="$1"
-    for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | tac); do
+    for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\\.[0-9]' | tac); do
         ctrl=$(lspci -s "$addr")
         if echo "$ctrl" | grep -iqE 'sata|raid|sas|storage controller|non-volatile'; then
             echo "$ctrl"
             return
         fi
     done
-    local first=$(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | head -1)
+    local first=$(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\\.[0-9]' | head -1)
     echo "Unknown Controller at $first"
 }
 
@@ -65,16 +65,17 @@ for disk in /sys/block/sd*; do
     vendor=$(cat "$disk/device/vendor" 2>/dev/null)
     size=$(lsblk -dn -o SIZE "$device")
     serial="unknown"
+    firmware="unknown"
     protocol=""
     linkspeed=""
 
     smartinfo=$(smartctl -i "$device" 2>/dev/null)
     protocol=$(echo "$smartinfo" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/^.*SATA Version is:[[:space:]]*//' | sed 's/(current:.*)//' | sed 's/[[:space:]]*$//')
     linkspeed=$(echo "$smartinfo" | grep -oP 'current:\s*\K[^)]+' | head -1)
-    [[ -z "$linkspeed" ]] && linkspeed=$(echo "$smartinfo" | grep -oP 'SATA.*,\s*\K[0-9.]+ Gb/s' | head -1)
+    [[ -z "$linkspeed" ]] && linkspeed=$(echo "$smartinfo" | grep -oP 'SATA.*,[[:space:]]*\K[0-9.]+ Gb/s' | head -1)
     serial=$(echo "$smartinfo" | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
+    firmware=$(echo "$smartinfo" | grep -i 'Firmware Version' | awk -F: '{print $2}' | xargs)
 
-    # Sysfs fallback
     if [[ -z "$linkspeed" ]]; then
         linkdir=$(readlink -f "$devpath" | grep -o '/ata[0-9]*/link[0-9]*')
         if [[ -n "$linkdir" && -e "/sys/class${linkdir}/sata_spd" ]]; then
@@ -85,8 +86,8 @@ for disk in /sys/block/sd*; do
 
     [[ -z "$linkspeed" ]] && linkspeed="unknown"
     [[ -z "$serial" ]] && serial="unknown"
+    [[ -z "$firmware" ]] && firmware="unknown"
 
-    # Link speed color
     if [[ "$linkspeed" =~ ^(12|16|32|8)\.0 ]]; then
         linkspeed_display="${BOLD_GREEN}🧩 link=$linkspeed${NC}"
     elif [[ "$linkspeed" == "6.0 Gb/s" ]]; then
@@ -97,7 +98,7 @@ for disk in /sys/block/sd*; do
         linkspeed_display="🧩 link=$linkspeed"
     fi
 
-    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial)"
+    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial, 🔧 FW: $firmware)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
@@ -113,6 +114,7 @@ for nvdev in /dev/nvme*n1; do
     vendor="unknown"
     link="unknown"
     serial="unknown"
+    firmware="unknown"
 
     idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
     model=$(echo "$idctrl" | grep -i "mn" | head -1 | awk -F: '{print $2}' | xargs)
@@ -120,6 +122,7 @@ for nvdev in /dev/nvme*n1; do
     width=$(echo "$idctrl" | grep -i "PCIe Link Width" | awk -F: '{print $2}' | xargs)
     speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
     serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
+    firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
     link="PCIe $speed x$width"
     size=$(lsblk -dn -o SIZE "$nvdev")
 
@@ -133,11 +136,16 @@ for nvdev in /dev/nvme*n1; do
         link_display="🧩 link=$link"
     fi
 
-    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial)"
+    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial, 🔧 FW: $firmware)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
 # Output
+echo -e "${CYAN}=============================="
+echo -e " Disk-to-Controller Tree (SATA/SAS/NVMe + Serial + Link Speed)"
+echo -e "==============================${NC}"
+echo ""
+
 for ctrl in "${!CONTROLLER_DISKS[@]}"; do
     echo -e "${CYAN}🎯 $ctrl${NC}"
     printf "${CONTROLLER_DISKS[$ctrl]}" | while read -r line; do
