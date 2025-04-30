@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x  # Debug trace
+set -x
 
 # === CONFIGURATION ===
 LLVM_VERSION="18"
@@ -11,13 +11,12 @@ PROFILE_DIR="$ROOT/pgo-profile"
 BUILD_DIR_GEN="$ROOT/build-gen"
 BUILD_DIR_USE="$ROOT/build-use"
 
-# Aggressive Optimization Flags
 PROFILE_FLAG=""
 export CFLAGS="-O3 -march=native -mtune=native -flto $PROFILE_FLAG -fomit-frame-pointer -fPIC"
 export CXXFLAGS="$CFLAGS"
 export LDFLAGS="-Wl,-O3 -flto $PROFILE_FLAG"
 
-# === Helper Functions (Colorful, Emoji, One-liners) ===
+# === Helper Functions ===
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; RESET='\033[0m'
 log()    { echo -e "\n${CYAN}ℹ️  [INFO]${RESET} $1\n"; }
 debug()  { echo -e "${BLUE}🐞 [DEBUG]${RESET} $1"; }
@@ -53,11 +52,19 @@ function build_with_flags() {
   cmake --build "$build_dir" --target llvm-spirv -- -j$(nproc) || fail "Build failed at stage: $stage_name"
 }
 
+function find_llvm_spirv_binary() {
+  local search_root="$1"
+  find "$search_root" -type f -name "llvm-spirv" -executable | head -n 1
+}
+
 function run_profiling_workload() {
   log "🏃 Running profiling workload..."
-  local spirv_bin="$BUILD_DIR_GEN/bin/llvm-spirv"
-  [[ -x "$spirv_bin" ]] || fail "SPIR-V binary not found: $spirv_bin"
+  local spirv_bin
+  spirv_bin="$(find_llvm_spirv_binary "$BUILD_DIR_GEN")"
+
+  [[ -n "$spirv_bin" && -x "$spirv_bin" ]] || fail "SPIR-V binary not found in build-gen!"
   "$spirv_bin" --version > /dev/null || fail "Profiling run failed"
+  debug "✅ Profiling binary found at: $spirv_bin"
 }
 
 function install_final_build() {
