@@ -44,19 +44,6 @@ activate_virtualenv() {
   source "$VENV/bin/activate"
 }
 
-create_cmake_config_template() {
-  local config_dir="$ROOT/cmake"
-  local template_file="$config_dir/SPIRV-ToolsConfig.cmake.in"
-
-  log "🧩 Creating SPIRV-ToolsConfig.cmake.in template..."
-  mkdir -p "$config_dir"
-  cat > "$template_file" <<EOF
-@PACKAGE_INIT@
-
-include("\${CMAKE_CURRENT_LIST_DIR}/SPIRV-ToolsTargets.cmake")
-EOF
-}
-
 fetch_repo() {
   if [[ ! -d "$ROOT/.git" ]]; then
     log "📥 Cloning SPIRV-Tools repository into $ROOT..."
@@ -118,8 +105,8 @@ install_final_build() {
   log "📦 Installing optimized build..."
   sudo cmake --install "$BUILD_DIR_USE" || fail "Install failed"
 
-  # Manually install only the config file (avoid exporting again)
-  local CONFIG_SRC="$BUILD_DIR_GEN/SPIRV-ToolsConfig.cmake"
+  # Copy SPIRV-ToolsConfig.cmake manually
+  local CONFIG_SRC="$BUILD_DIR_USE/SPIRV-ToolsConfig.cmake"
   local CONFIG_DEST="$PREFIX/lib/cmake/SPIRV-Tools"
 
   if [[ -f "$CONFIG_SRC" ]]; then
@@ -143,7 +130,6 @@ validate_install() {
 main() {
   activate_virtualenv
   fetch_repo
-  create_cmake_config_template
 
   log "🔁 First pass: -fprofile-generate"
   build_with_flags "$BUILD_DIR_GEN" "-fprofile-generate=$PROFILE_DIR" "Generate"
