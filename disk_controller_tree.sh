@@ -84,7 +84,7 @@ process_sata_disks() {
         linkspeed=${linkspeed:-unknown}
 
         linkspeed_display=$(color_link_speed "$linkspeed")
-        disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial, 🔧 FW: $firmware, $smart_health"
+        disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, $smart_health, 🔢 SN: $serial, 🔧 FW: $firmware"
         CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
     done
 }
@@ -119,7 +119,7 @@ process_nvme_disks() {
         link="PCIe ${speed:-unknown} x${width:-unknown}"
         link_display=$(color_link_speed "$link")
 
-        disk_info="${GREEN}💾 $nvdev${NC}  (0x$vendorid $model, $size, NVMe, $link_display, 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}, $smart_health"
+        disk_info="${GREEN}💾 $nvdev${NC}  (0x$vendorid $model, $size, NVMe, $link_display, $smart_health, 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}"
         CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
     done
 }
