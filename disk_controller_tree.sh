@@ -4,15 +4,16 @@ set -e
 # Display Header
 print_header() {
     echo -e "
-╔════════════════════════════════════════════════════════════════════╗
-║ 🧩  Disk-to-Controller Tree Visualizer                              ║
-║ 👤  Author : bitranox                                               ║
-║ 🏛️  License: MIT                                                    ║
-║ 💾  Shows disks grouped by controller with model, size, interface,  ║
-║     serial, and link speed                                         ║
-╚════════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════════════════════════════════╗
+║ 🧩  Disk-to-Controller Tree Visualizer                                                 ║
+║ 👤  Author : bitranox                                                                  ║
+║ 🏛️  License: MIT                                                                       ║
+║ 💾  Shows disks grouped by controller with model, size, interface, link speed,         ║
+║     SMART status, drive temperature, serial number, and firmware revision             ║
+╚════════════════════════════════════════════════════════════════════════════════════════╝
 "
 }
+
 
 # Color Setup
 setup_colors() {
