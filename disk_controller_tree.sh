@@ -78,7 +78,13 @@ get_drive_temperature() {
     if [[ "$type" == "sata" ]]; then
         temp=$(smartctl -A "$device" 2>/dev/null | awk '/[Tt]emp/ && NF >= 10 {print $10; exit}')
     elif [[ "$type" == "nvme" ]]; then
-        temp=$(nvme smart-log "$device" 2>/dev/null | awk -F: '/(composite )?temperature/ {gsub(/[^0-9]/,"",$2); print $2; exit}')
+        temp=$(nvme smart-log "$device" 2>/dev/null | awk -F: '/composite temperature/ {gsub(/[^0-9]/,"",$2); print $2; exit}')
+        if [[ "$temp" =~ ^[0-9]+$ ]]; then
+            if [[ "$temp" -gt 1000 ]]; then
+                temp=$((temp / 1000))  # Convert millikelvin to kelvin
+            fi
+            temp=$((temp - 273))      # Convert kelvin to celsius
+        fi
     fi
 
     if [[ "$temp" =~ ^[0-9]+$ ]]; then
@@ -151,8 +157,16 @@ process_nvme_disks() {
         firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
         size=$(lsblk -dn -o SIZE "$nvdev")
 
-        smart_health_val=$(nvme smart-log "$nvdev" | grep -i 'overall' | awk -F: '{print $2}' | xargs)
-        smart_health=$(format_smart_health "$smart_health_val")
+        # SMART health check via critical_warning field
+        critical_warning=$(nvme smart-log "$nvdev" 2>/dev/null | awk -F: '/^critical_warning/ {gsub(/[^0-9a-fx]/,"",$2); print $2}')
+        if [[ "$critical_warning" == "0x00" || "$critical_warning" == "0" ]]; then
+            smart_health="❤️ SMART: ✅"
+        elif [[ -z "$critical_warning" ]]; then
+            smart_health="❤️ SMART: ❓"
+        else
+            smart_health="${RED}❤️ SMART: ⚠️${NC}"
+        fi
+
         temperature=$(get_drive_temperature "$nvdev" "nvme")
 
         width=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_width" 2>/dev/null || echo "")
@@ -163,10 +177,10 @@ process_nvme_disks() {
             speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
         }
 
-        link="PCIe ${speed:-unknown} x${width:-unknown}"
+        link="PCIe ${speed:-unknown} PCIe x${width:-unknown}"
         link_display=$(color_link_speed "$link")
 
-        disk_info="${GREEN}💾 $nvdev${NC}  (0x$vendorid $model, $size, NVMe, $link_display, $smart_health, $temperature, 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}"
+        disk_info="${GREEN}💾 $nvdev${NC}  (0x0x$vendorid $model, $size, NVMe, $link_display, $smart_health, $temperature, 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}"
         CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
     done
 }
