@@ -10,7 +10,7 @@ PROFILE_DIR="$ROOT/pgo-profile"
 BUILD_DIR_GEN="$ROOT/build-gen"
 BUILD_DIR_USE="$ROOT/build-use"
 
-export CFLAGS="-O3 -march=native -mtune=native -flto $PROFILE_FLAG -fomit-frame-pointer -fPIC"
+export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
 export CXXFLAGS="$CFLAGS"
 export LDFLAGS="-Wl,-O3 -flto"
 
