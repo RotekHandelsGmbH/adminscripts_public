@@ -42,7 +42,9 @@ patch_cmake_if_needed() {
   if ! grep -q "find_package(SPIRV-Tools" CMakeLists.txt; then
     log "Patching CMakeLists.txt for SPIRV-Tools..."
     sed -i '2i\
-find_package(SPIRV-Tools REQUIRED CONFIG)\nset(SPIRV-Tools_INCLUDE_DIR "'"$PREFIX"'/include")\nset(SPIRV-Tools_LIBRARY "'"$PREFIX"'/lib/libSPIRV-Tools.a")\n' CMakeLists.txt
+find_package(SPIRV-Tools REQUIRED CONFIG)\n\
+set(SPIRV-Tools_INCLUDE_DIR "'"$PREFIX"'/include")\n\
+set(SPIRV-Tools_LIBRARY "'"$PREFIX"'/lib/libSPIRV-Tools.a")\n' CMakeLists.txt
   fi
 }
 
@@ -63,7 +65,9 @@ build_with_flags() {
   cmake -S "$LLVM_PROJECT_DIR/libclc" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_CONFIG="$LLVM_CONFIG"
+    -DLLVM_CONFIG="$LLVM_CONFIG" \
+    -DCMAKE_PREFIX_PATH="$PREFIX;$PREFIX/lib;$PREFIX/lib/cmake" \
+    -DSPIRV-Tools_DIR="$PREFIX/lib/cmake/SPIRV-Tools"
 
   cmake --build "$BUILD_DIR" -- -j"$(nproc)"
 }
@@ -75,31 +79,29 @@ run_profiling_workload() {
   local WORK_DIR="$ROOT/profiling-kernels"
   mkdir -p "$WORK_DIR"
 
-  # Generate simple IR using llvm-as
-  cat > "$WORK_DIR/dummy.cl" <<EOF
+  # Dummy LLVM IR
+  cat > "$WORK_DIR/dummy.ll" <<EOF
 define i32 @add(i32 %a, i32 %b) {
   %sum = add i32 %a, %b
   ret i32 %sum
 }
+define i32 @main() {
+  %call = call i32 @add(i32 1, i32 2)
+  ret i32 %call
+}
 EOF
 
-  log "📦 Assembling IR to bitcode..."
-  echo "define i32 @main() { ret i32 0 }" > "$WORK_DIR/main.ll"
-
   local LLVM_BIN_DIR="$($LLVM_CONFIG --bindir)"
-  "$LLVM_BIN_DIR/llvm-as" "$WORK_DIR/dummy.cl" -o "$WORK_DIR/dummy.bc"
-  "$LLVM_BIN_DIR/llvm-as" "$WORK_DIR/main.ll" -o "$WORK_DIR/main.bc"
+  log "📦 Assembling IR to bitcode..."
+  "$LLVM_BIN_DIR/llvm-as" "$WORK_DIR/dummy.ll" -o "$WORK_DIR/dummy.bc"
 
-  log "🔗 Linking bitcode files with llvm-link..."
-  "$LLVM_BIN_DIR/llvm-link" "$WORK_DIR/dummy.bc" "$WORK_DIR/main.bc" -o "$WORK_DIR/linked.bc"
-
-  log "🛠️ Compiling linked.bc to object with llc..."
-  "$LLVM_BIN_DIR/llc" -filetype=obj "$WORK_DIR/linked.bc" -o "$WORK_DIR/linked.o"
+  log "🛠️ Compiling bitcode to object with llc..."
+  "$LLVM_BIN_DIR/llc" -filetype=obj "$WORK_DIR/dummy.bc" -o "$WORK_DIR/dummy.o"
 
   log "📎 Linking with GCC..."
-  gcc "$WORK_DIR/linked.o" -o "$WORK_DIR/test_bin" || fail "Linking failed"
+  gcc "$WORK_DIR/dummy.o" -o "$WORK_DIR/test_bin" || fail "Linking failed"
 
-  log "🚀 Running final binary to trigger profiling..."
+  log "🚀 Running binary to trigger profiling..."
   "$WORK_DIR/test_bin" || true
 }
 
