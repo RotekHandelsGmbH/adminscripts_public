@@ -63,23 +63,44 @@ build_with_flags() {
   cmake -S "$LLVM_PROJECT_DIR/libclc" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_CONFIG="$LLVM_CONFIG" \
-    -DENABLE_SPIRV=ON \
-    -DCMAKE_PREFIX_PATH="$PREFIX;$PREFIX/lib;$PREFIX/lib/cmake" \
-    -DCMAKE_MODULE_PATH="$PREFIX/lib/cmake/SPIRV-Tools" \
-    -DSPIRV_TOOLS_INCLUDE_DIR="$PREFIX/include" \
-    -DSPIRV_TOOLS_LIBRARY="$PREFIX/lib/libSPIRV-Tools.a" \
-    -DSPIRV-Tools_DIR="$PREFIX/lib/cmake/SPIRV-Tools" \
-    -DLLVM_SPIRV="$PREFIX/bin/llvm-spirv"
+    -DLLVM_CONFIG="$LLVM_CONFIG"
 
   cmake --build "$BUILD_DIR" -- -j"$(nproc)"
 }
 
-# === Run Profiling Workload (Dummy) ===
+# === Simulate Workload using GCC and LLVM Tools ===
 run_profiling_workload() {
   log "⚡ Running profiling workload..."
-  # Replace this with actual usage (e.g. compiling kernels)
-  find "$BUILD_GEN" -type f -executable -exec {} \; || true
+
+  local WORK_DIR="$ROOT/profiling-kernels"
+  mkdir -p "$WORK_DIR"
+
+  # Generate simple IR using llvm-as
+  cat > "$WORK_DIR/dummy.cl" <<EOF
+define i32 @add(i32 %a, i32 %b) {
+  %sum = add i32 %a, %b
+  ret i32 %sum
+}
+EOF
+
+  log "📦 Assembling IR to bitcode..."
+  echo "define i32 @main() { ret i32 0 }" > "$WORK_DIR/main.ll"
+
+  local LLVM_BIN_DIR="$($LLVM_CONFIG --bindir)"
+  "$LLVM_BIN_DIR/llvm-as" "$WORK_DIR/dummy.cl" -o "$WORK_DIR/dummy.bc"
+  "$LLVM_BIN_DIR/llvm-as" "$WORK_DIR/main.ll" -o "$WORK_DIR/main.bc"
+
+  log "🔗 Linking bitcode files with llvm-link..."
+  "$LLVM_BIN_DIR/llvm-link" "$WORK_DIR/dummy.bc" "$WORK_DIR/main.bc" -o "$WORK_DIR/linked.bc"
+
+  log "🛠️ Compiling linked.bc to object with llc..."
+  "$LLVM_BIN_DIR/llc" -filetype=obj "$WORK_DIR/linked.bc" -o "$WORK_DIR/linked.o"
+
+  log "📎 Linking with GCC..."
+  gcc "$WORK_DIR/linked.o" -o "$WORK_DIR/test_bin" || fail "Linking failed"
+
+  log "🚀 Running final binary to trigger profiling..."
+  "$WORK_DIR/test_bin" || true
 }
 
 # === Install Final Build ===
@@ -88,7 +109,7 @@ install_final_build() {
   success "libclc installed to $PREFIX"
 }
 
-# === MAIN BUILD FLOW ===
+# === MAIN FLOW ===
 log "🚀 Starting 2-pass PGO build for libclc..."
 
 fetch_repo
