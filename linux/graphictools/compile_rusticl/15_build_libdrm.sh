@@ -15,6 +15,11 @@ success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
 fail()   { error "$1"; exit 1; }
 
+# === Force GCC ===
+log "🛠️ Forcing GCC as the compiler"
+export CC=gcc
+export CXX=g++
+
 # === Build libdrm with aggressive optimization and PGO ===
 function build_libdrm() {
   log "Building libdrm >= 2.4.121 with PGO and LTO..."
@@ -25,9 +30,6 @@ function build_libdrm() {
       https://gitlab.freedesktop.org/mesa/drm.git "$ROOT/drm" \
       || fail "Failed to clone libdrm repository"
   fi
-
-  export CC=gcc
-  export CXX=g++
 
   # === First pass: generate profiling data ===
   log "🔁 First pass: compiling with -fprofile-generate"

@@ -16,10 +16,13 @@ success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
 fail()   { error "$1"; exit 1; }
 
-# === Compiler Optimization Flags ===
-log "🛠️ Setting compiler and linker flags for aggressive performance optimization with PGO"
+# === Force GCC ===
+log "🛠️ Forcing GCC as the compiler"
 export CC=gcc
 export CXX=g++
+
+# === Compiler Optimization Flags ===
+log "🛠️ Setting compiler and linker flags for aggressive performance optimization with PGO"
 export CFLAGS="-O3 -march=native -mtune=native -flto -fprofile-generate -fomit-frame-pointer -fPIC"
 export CXXFLAGS="$CFLAGS"
 export LDFLAGS="-Wl,-O3 -flto -fprofile-generate"
