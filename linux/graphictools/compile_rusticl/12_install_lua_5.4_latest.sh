@@ -29,7 +29,7 @@ detect_latest_tarball() {
   log "🔍 Detecting latest Lua 5.4.x tarball from $LUA_BASE_URL"
   local listing candidates latest
   listing=$(curl -fs "$LUA_BASE_URL/") || fail "Failed to fetch tarball listing"
-  candidates=$(printf "%s" "$listing" | grep -Eo 'lua-5\.4\.[0-9]+\.tar\.gz' | sort -V | uniq)
+  candidates=$(echo "$listing" | grep -Eo 'lua-5\.4\.[0-9]+\.tar\.gz' | sort -V | uniq)
   latest=$(echo "$candidates" | tail -n1)
   [[ -n "$latest" ]] || fail "No Lua 5.4.x tarball found"
   echo "$latest"
