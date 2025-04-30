@@ -5,10 +5,10 @@ set -e
 # Display program header
 echo -e "
 ╔════════════════════════════════════════════════════════════════════╗
-║ 🧩  Disk-to-Controller Tree Visualizer                             ║
-║ 👤  Author : bitranox                                              ║
-║ 🏛️  License: MIT                                                   ║
-║ 💾  Shows disks grouped by controller with model, size, interface,║
+║ 🧩  Disk-to-Controller Tree Visualizer                              ║
+║ 👤  Author : bitranox                                               ║
+║ 🏛️  License: MIT                                                    ║
+║ 💾  Shows disks grouped by controller with model, size, interface,  ║
 ║     serial, and link speed                                         ║
 ╚════════════════════════════════════════════════════════════════════╝
 "
