@@ -95,7 +95,7 @@ for disk in /sys/block/sd*; do
         linkspeed_display="🧩 link=$linkspeed"
     fi
 
-    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial, 🔧 FW: $firmware, ❤️ SMART: $smart_health)""
+    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial, 🔧 FW: $firmware, ❤️ SMART: $smart_health)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
@@ -164,7 +164,7 @@ for nvdev in /dev/nvme*n1; do
         link_display="🧩 link=$link"
     fi
 
-    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial, 🔧 FW: $firmware, ❤️ SMART: $smart_health)""
+    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial, 🔧 FW: $firmware, ❤️ SMART: $smart_health)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
