@@ -40,7 +40,6 @@ function build_libdrm() {
     -Dprefix="$PREFIX" \
     -Damdgpu=enabled \
     -Dbuildtype=release \
-    --reconfigure \
     || fail "Meson setup (generate phase) failed"
 
   ninja -v -C "$ROOT/drm/build" || fail "libdrm build (generate) failed"
@@ -77,7 +76,6 @@ EOF
     -Dprefix="$PREFIX" \
     -Damdgpu=enabled \
     -Dbuildtype=release \
-    --reconfigure \
     || fail "Meson setup (use phase) failed"
 
   ninja -v -C "$ROOT/drm/build" || fail "libdrm build (use) failed"
