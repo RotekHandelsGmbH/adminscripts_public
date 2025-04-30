@@ -39,11 +39,6 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
     echo -e "${GREEN}🎉 Required packages installed successfully.${NC}"
 fi
 
-echo -e "${CYAN}=============================="
-echo -e " Disk-to-Controller Tree (SATA/SAS/NVMe + Serial + Link Speed)"
-echo -e "==============================${NC}"
-echo ""
-
 declare -A CONTROLLER_DISKS
 
 get_storage_controller() {
