@@ -4,6 +4,7 @@ set -e
 declare -A CONTROLLER_DISKS
 
 main() {
+    [[ $EUID -ne 0 ]] && { echo -e "${RED}❌ This script must be run as root.${NC}"; exit 1; }
     print_header
     setup_colors
     check_dependencies
