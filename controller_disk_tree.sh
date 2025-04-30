@@ -5,6 +5,7 @@ set -e
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+BOLD_GREEN='\033[1;32m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
@@ -79,7 +80,18 @@ for disk in /sys/block/sd*; do
     [[ -z "$linkspeed" ]] && linkspeed="unknown"
     [[ -z "$serial" ]] && serial="unknown"
 
-    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, ${BLUE}🧩 link=$linkspeed${NC}, ${YELLOW}🔢 SN: $serial${NC})"
+    # Color the link speed
+    if [[ "$linkspeed" =~ ^(12|16|32|8)\.0 ]]; then
+        linkspeed_display="${BOLD_GREEN}🧩 link=$linkspeed${NC}"
+    elif [[ "$linkspeed" == "6.0 Gb/s" ]]; then
+        linkspeed_display="${GREEN}🧩 link=$linkspeed${NC}"
+    elif [[ "$linkspeed" == "3.0 Gb/s" ]]; then
+        linkspeed_display="${YELLOW}🧩 link=$linkspeed${NC}"
+    else
+        linkspeed_display="🧩 link=$linkspeed"
+    fi
+
+    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, ${YELLOW}🔢 SN: $serial${NC})"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
@@ -103,9 +115,20 @@ for nvdev in /dev/nvme*n1; do
     speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
     serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
     link="PCIe $speed x$width"
-
     size=$(lsblk -dn -o SIZE "$nvdev")
-    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, ${BLUE}🧩 link=$link${NC}, ${YELLOW}🔢 SN: $serial${NC})"
+
+    # Color the NVMe link
+    if [[ "$link" =~ (16\.0|32\.0|8\.0|12\.0) ]]; then
+        link_display="${BOLD_GREEN}🧩 link=$link${NC}"
+    elif [[ "$link" =~ 6\.0 ]]; then
+        link_display="${GREEN}🧩 link=$link${NC}"
+    elif [[ "$link" =~ 3\.0 ]]; then
+        link_display="${YELLOW}🧩 link=$link${NC}"
+    else
+        link_display="🧩 link=$link"
+    fi
+
+    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, ${YELLOW}🔢 SN: $serial${NC})"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
