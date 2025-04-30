@@ -124,7 +124,7 @@ meson setup "$BUILD_DIR" . \
   -Dgles2=enabled \
   -Dopengl=true \
   -Dglvnd=enabled \
-  -Drusticl=true -Dopencl-native=true \
+  -Dopencl-native=true \
   --warnlevel=1
 
   log "Compiling Mesa…"
