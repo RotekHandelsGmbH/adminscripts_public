@@ -57,19 +57,19 @@ get_storage_controller() {
     echo "Unknown Controller"
 }
 
-# Format SMART health status (with comma)
+# Format SMART health status (with spacing and comma)
 format_smart_health() {
     local status="$1"
     if [[ "$status" =~ ^(PASSED|OK|0)$ ]]; then
-        echo "❤️ SMART: ✅,"
+        echo "❤️ SMART: ✅ ,"
     elif [[ -z "$status" ]]; then
-        echo "❤️ SMART: ❓,"
+        echo "❤️ SMART: ❓ ,"
     else
-        echo -e "${RED}❤️ SMART: ⚠️,${NC}"
+        echo -e "${RED}❤️ SMART: ⚠️ ,${NC}"
     fi
 }
 
-# Get drive temperature (fixed for awk/sed compatibility)
+# Get drive temperature (portable)
 get_drive_temperature() {
     local device="$1"
     local type="$2"
@@ -151,14 +151,14 @@ process_nvme_disks() {
         firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
         size=$(lsblk -dn -o SIZE "$nvdev")
 
-        # SMART health check via critical_warning field (with comma)
+        # SMART health check via critical_warning field (with space+comma)
         critical_warning=$(nvme smart-log "$nvdev" 2>/dev/null | awk -F: '/^critical_warning/ {gsub(/[^0-9a-fx]/,"",$2); print $2}')
         if [[ "$critical_warning" == "0x00" || "$critical_warning" == "0" ]]; then
-            smart_health="❤️ SMART: ✅,"
+            smart_health="❤️ SMART: ✅ ,"
         elif [[ -z "$critical_warning" ]]; then
-            smart_health="❤️ SMART: ❓,"
+            smart_health="❤️ SMART: ❓ ,"
         else
-            smart_health="${RED}❤️ SMART: ⚠️,${NC}"
+            smart_health="${RED}❤️ SMART: ⚠️ ,${NC}"
         fi
 
         temperature=$(get_drive_temperature "$nvdev" "nvme")
