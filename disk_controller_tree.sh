@@ -41,8 +41,6 @@ fi
 
 declare -A CONTROLLER_DISKS
 
-
-
 get_storage_controller() {
     local devpath="$1"
     for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | tac); do
@@ -55,7 +53,6 @@ get_storage_controller() {
     echo "Unknown Controller"
 }
 
-
 # SATA/SAS drives
 for disk in /sys/block/sd*; do
     diskname=$(basename "$disk")
@@ -66,8 +63,18 @@ for disk in /sys/block/sd*; do
     model=$(cat "$disk/device/model" 2>/dev/null)
     vendor=$(cat "$disk/device/vendor" 2>/dev/null)
     size=$(lsblk -dn -o SIZE "$device")
-    serial=$(smartctl -i "$device" | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
-    firmware=$(smartctl -i "$device" | grep -i 'Firmware Version' | awk -F: '{print $2}' | xargs)
+    serial=$(smartctl -i "$device" 2>/dev/null | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
+    firmware=$(smartctl -i "$device" 2>/dev/null | grep -i 'Firmware Version' | awk -F: '{print $2}' | xargs)
+
+    smart_health=$(smartctl -H "$device" 2>/dev/null | grep -iE 'SMART.*(result|assessment)' | awk -F: '{print $2}' | xargs)
+    if [[ "$smart_health" =~ ^(PASSED|OK)$ ]]; then
+        smart_health="${GREEN}✔️ $smart_health${NC}"
+    elif [[ -z "$smart_health" ]]; then
+        smart_health="unknown"
+    else
+        smart_health="${RED}⚠️ $smart_health${NC}"
+    fi
+
     protocol=$(smartctl -i "$device" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/^.*SATA Version is:[[:space:]]*//' | sed 's/(current:.*)//' | sed 's/[[:space:]]*$//')
     linkspeed=$(smartctl -i "$device" | grep -oP 'current:\s*\K[^)]+' | head -1)
     [[ -z "$linkspeed" ]] && linkspeed=$(smartctl -i "$device" | grep -oP 'SATA.*,[[:space:]]*\K[0-9.]+ Gb/s' | head -1)
@@ -87,40 +94,46 @@ for disk in /sys/block/sd*; do
         linkspeed_display="🧩 link=$linkspeed"
     fi
 
-    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial, 🔧 FW: $firmware)"
+    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial, 🔧 FW: $firmware, ❤️ SMART: $smart_health)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
-
 # NVMe drives
 for nvdev in /dev/nvme*n1; do
-
     [[ -b "$nvdev" ]] || continue
     sysdev="/sys/block/$(basename "$nvdev")/device"
     controller=$(get_storage_controller "$sysdev")
     [[ -z "$controller" ]] && controller="Unknown Controller"
-
 
     idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
     if [[ -z "$idctrl" ]]; then
         echo -e "${RED}⚠️  Failed to read NVMe info from $nvdev — skipping.${NC}"
         continue
     fi
+
     model=$(echo "$idctrl" | grep -i "mn" | head -1 | awk -F: '{print $2}' | xargs)
     vendorid=$(echo "$idctrl" | grep -i "vid" | head -1 | awk -F: '{print $2}' | xargs)
     vendor="0x$vendorid"
     serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
     firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
     size=$(lsblk -dn -o SIZE "$nvdev")
+
+    smart_health_val=$(nvme smart-log "$nvdev" 2>/dev/null | grep -i 'overall' | awk -F: '{print $2}' | xargs)
+    if [[ "$smart_health_val" == "0" ]]; then
+        smart_health="${GREEN}✔️ OK${NC}"
+    elif [[ -z "$smart_health_val" ]]; then
+        smart_health="unknown"
+    else
+        smart_health="${RED}⚠️ $smart_health_val${NC}"
+    fi
+
     [[ -z "$serial" ]] && serial="unknown"
     [[ -z "$firmware" ]] && firmware="unknown"
     [[ -z "$size" ]] && size="unknown"
 
-    # Try sysfs first
     width=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_width" 2>/dev/null || echo "")
     speed=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_speed" 2>/dev/null || echo "")
 
-    # Fallback to id-ctrl
     if [[ -z "$width" || -z "$speed" ]]; then
         width=$(echo "$idctrl" | grep -i "PCIe Link Width" | awk -F: '{print $2}' | xargs)
         speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
@@ -142,7 +155,7 @@ for nvdev in /dev/nvme*n1; do
         link_display="🧩 link=$link"
     fi
 
-    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial, 🔧 FW: $firmware)"
+    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial, 🔧 FW: $firmware, ❤️ SMART: $smart_health)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
