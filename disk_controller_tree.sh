@@ -57,19 +57,19 @@ get_storage_controller() {
     echo "Unknown Controller"
 }
 
-# Format SMART health status
+# Format SMART health status (with comma)
 format_smart_health() {
     local status="$1"
     if [[ "$status" =~ ^(PASSED|OK|0)$ ]]; then
-        echo "❤️ SMART: ✅"
+        echo "❤️ SMART: ✅,"
     elif [[ -z "$status" ]]; then
-        echo "❤️ SMART: ❓"
+        echo "❤️ SMART: ❓,"
     else
-        echo -e "${RED}❤️ SMART: ⚠️${NC}"
+        echo -e "${RED}❤️ SMART: ⚠️,${NC}"
     fi
 }
 
-# Get drive temperature (fixed, portable)
+# Get drive temperature (fixed for awk/sed compatibility)
 get_drive_temperature() {
     local device="$1"
     local type="$2"
@@ -82,9 +82,9 @@ get_drive_temperature() {
     fi
 
     if [[ "$temp" =~ ^[0-9]+$ ]]; then
-        echo "🌡️ ${temp}°C"
+        echo "🌡️ ${temp}°C,"
     else
-        echo "🌡️ N/A"
+        echo "🌡️ N/A,"
     fi
 }
 
@@ -130,7 +130,7 @@ process_sata_disks() {
         linkspeed=${linkspeed:-unknown}
 
         linkspeed_display=$(color_link_speed "$linkspeed")
-        disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, $smart_health, $temperature, 🔢 SN: $serial, 🔧 FW: $firmware"
+        disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, $smart_health $temperature 🔢 SN: $serial, 🔧 FW: $firmware"
         CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
     done
 }
@@ -151,14 +151,14 @@ process_nvme_disks() {
         firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
         size=$(lsblk -dn -o SIZE "$nvdev")
 
-        # SMART health check via critical_warning field
+        # SMART health check via critical_warning field (with comma)
         critical_warning=$(nvme smart-log "$nvdev" 2>/dev/null | awk -F: '/^critical_warning/ {gsub(/[^0-9a-fx]/,"",$2); print $2}')
         if [[ "$critical_warning" == "0x00" || "$critical_warning" == "0" ]]; then
-            smart_health="❤️ SMART: ✅"
+            smart_health="❤️ SMART: ✅,"
         elif [[ -z "$critical_warning" ]]; then
-            smart_health="❤️ SMART: ❓"
+            smart_health="❤️ SMART: ❓,"
         else
-            smart_health="${RED}❤️ SMART: ⚠️${NC}"
+            smart_health="${RED}❤️ SMART: ⚠️,${NC}"
         fi
 
         temperature=$(get_drive_temperature "$nvdev" "nvme")
@@ -174,7 +174,7 @@ process_nvme_disks() {
         link="PCIe ${speed:-unknown} PCIe x${width:-unknown}"
         link_display=$(color_link_speed "$link")
 
-        disk_info="${GREEN}💾 $nvdev${NC}  (0x0x$vendorid $model, $size, NVMe, $link_display, $smart_health, $temperature, 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}"
+        disk_info="${GREEN}💾 $nvdev${NC}  (0x0x$vendorid $model, $size, NVMe, $link_display, $smart_health $temperature 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}"
         CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
     done
 }
