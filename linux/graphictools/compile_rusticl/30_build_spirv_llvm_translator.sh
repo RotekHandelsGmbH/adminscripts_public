@@ -78,12 +78,11 @@ function validate_install() {
 
 function build_spirv_llvm_translator() {
   log "📦 Building SPIRV-LLVM-Translator with PGO and aggressive optimization..."
-
+  rm -rf "$ROOT"
   mkdir -p "$ROOT"
   cd "$ROOT"
 
   log "📥 Cloning fresh SPIRV-LLVM-Translator repository..."
-  rm -rf spirv-llvm-translator
   git clone --depth=1 --branch llvm_release_180 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git || fail "Clone failed"
 
   [[ -d "spirv-llvm-translator" ]] || fail "spirv-llvm-translator directory missing after clone"
