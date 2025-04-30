@@ -183,9 +183,6 @@ process_nvme_disks() {
 # Print final results
 print_output() {
     echo -e "${BLUE}📤 Preparing output...${NC}"
-    echo -e "${CYAN}=============================="
-    echo -e " Disk-to-Controller Tree (SATA/SAS/NVMe + Serial + Link Speed)"
-    echo -e "==============================${NC}\n"
 
     for ctrl in "${!CONTROLLER_DISKS[@]}"; do
         echo -e "${CYAN}🎯 $ctrl${NC}"
