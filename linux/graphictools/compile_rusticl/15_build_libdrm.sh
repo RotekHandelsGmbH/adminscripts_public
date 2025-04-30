@@ -1,52 +1,54 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-# === CONFIGURATION ===
-PREFIX="/opt/mesa"
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# === Helper Functions (Colorful, Emoji, One-liners) ===
-
-# Color codes
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; RESET='\033[0m'
-
-log()    { echo -e "\n${CYAN}ℹ️  [INFO]${RESET} $1\n"; }
-debug()  { echo -e "${BLUE}🐞 [DEBUG]${RESET} $1"; }
-warn()   { echo -e "${YELLOW}⚠️ [WARN]${RESET} $1"; }
-success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
-error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
-fail()   { error "$1"; exit 1; }
-
-# === Force Clang ===
-log "🛠️ Forcing Clang as the compiler"
-export CC=clang
-export CXX=clang++
-
-# === Build libdrm ===
 function build_libdrm() {
-  log "Building libdrm >= 2.4.121..."
+  log "Building libdrm >= 2.4.121 with PGO and LTO..."
 
-  # Clone specific libdrm branch
-  git clone --depth=1 --branch libdrm-2.4.121 \
-    https://gitlab.freedesktop.org/mesa/drm.git "$ROOT/drm" \
-    || fail "Failed to clone libdrm repository"
+  # Clone if not already cloned
+  if [[ ! -d "$ROOT/drm" ]]; then
+    git clone --depth=1 --branch libdrm-2.4.121 \
+      https://gitlab.freedesktop.org/mesa/drm.git "$ROOT/drm" \
+      || fail "Failed to clone libdrm repository"
+  fi
 
-  # Configure with Meson
+  export CC=gcc
+  export CXX=g++
+
+  # === First build: Profile-generate ===
+  log "🔁 First pass: compiling with -fprofile-generate"
+  export CFLAGS="-O3 -march=native -mtune=native -flto -fprofile-generate -fomit-frame-pointer -fPIC"
+  export CXXFLAGS="$CFLAGS"
+  export LDFLAGS="-Wl,-O3 -flto -fprofile-generate"
+
+  rm -rf "$ROOT/drm/build"
   meson setup "$ROOT/drm/build" "$ROOT/drm" \
     -Dprefix="$PREFIX" \
     -Damdgpu=enabled \
     -Dbuildtype=release \
-    || fail "Meson setup for libdrm failed"
+    || fail "Meson setup (generate phase) failed"
 
-  # Build and install
-  ninja -C "$ROOT/drm/build" || fail "libdrm build failed"
-  sudo ninja -C "$ROOT/drm/build" install || fail "libdrm install failed"
+  ninja -C "$ROOT/drm/build" || fail "libdrm build (generate) failed"
+  sudo ninja -C "$ROOT/drm/build" install || fail "libdrm install (generate) failed"
 
-  # Update pkg-config path and report version
+  # === Simulate workload (replace with actual test app) ===
+  log "⚙️ Running simulated workload for PGO data collection..."
+  # Add your real test/workload here, or replace with an actual executable using libdrm
+  sleep 2  # Placeholder
+
+  # === Second build: Profile-use ===
+  log "🔁 Second pass: compiling with -fprofile-use"
+  export CFLAGS="-O3 -march=native -mtune=native -flto -fprofile-use -fomit-frame-pointer -fPIC"
+  export CXXFLAGS="$CFLAGS"
+  export LDFLAGS="-Wl,-O3 -flto -fprofile-use"
+
+  rm -rf "$ROOT/drm/build"
+  meson setup "$ROOT/drm/build" "$ROOT/drm" \
+    -Dprefix="$PREFIX" \
+    -Damdgpu=enabled \
+    -Dbuildtype=release \
+    || fail "Meson setup (use phase) failed"
+
+  ninja -C "$ROOT/drm/build" || fail "libdrm build (use) failed"
+  sudo ninja -C "$ROOT/drm/build" install || fail "libdrm install (use) failed"
+
+  # Final confirmation
   export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib/x86_64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH:-}"
   debug "libdrm_amdgpu version: $(pkg-config --modversion libdrm_amdgpu || echo 'Not found')"
 }
-
-# === MAIN ===
-build_libdrm
-log "libdrm build complete."
