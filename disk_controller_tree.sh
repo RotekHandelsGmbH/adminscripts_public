@@ -41,21 +41,21 @@ fi
 
 declare -A CONTROLLER_DISKS
 
-echo -e "${BLUE}🔍 Scanning for disks...${NC}"
+
 
 get_storage_controller() {
     local devpath="$1"
-    for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\\.[0-9]' | tac); do
+    for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | tac); do
         ctrl=$(lspci -s "$addr")
         if echo "$ctrl" | grep -iqE 'sata|raid|sas|storage controller|non-volatile'; then
-            echo "$ctrl"
+            echo "$addr ${ctrl#*:}"
             return
         fi
     done
     echo "Unknown Controller"
 }
 
-echo -e "${BLUE}📦 Scanning SATA/SAS drives...${NC}"
+
 # SATA/SAS drives
 for disk in /sys/block/sd*; do
     diskname=$(basename "$disk")
@@ -91,15 +91,15 @@ for disk in /sys/block/sd*; do
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
-echo -e "${BLUE}📦 Scanning NVMe drives...${NC}"
+
 # NVMe drives
 for nvdev in /dev/nvme*n1; do
-    echo -e "${CYAN}🔎 Found NVMe device: $nvdev${NC}"
+
     [[ -b "$nvdev" ]] || continue
     sysdev="/sys/block/$(basename "$nvdev")/device"
     controller=$(get_storage_controller "$sysdev")
     [[ -z "$controller" ]] && controller="Unknown Controller"
-    echo -e "${CYAN}📌 Controller: $controller${NC}"
+
 
     idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
     if [[ -z "$idctrl" ]]; then
