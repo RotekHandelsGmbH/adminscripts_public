@@ -82,13 +82,9 @@ function build_spirv_llvm_translator() {
   mkdir -p "$ROOT"
   cd "$ROOT"
 
-  if [[ ! -d "spirv-llvm-translator/.git" ]]; then
-    log "📥 Cloning SPIRV-LLVM-Translator repository..."
-    rm -rf spirv-llvm-translator
-    git clone --depth=1 --branch llvm_release_180 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git || fail "Clone failed"
-  else
-    log "📁 Using existing spirv-llvm-translator directory"
-  fi
+  log "📥 Cloning fresh SPIRV-LLVM-Translator repository..."
+  rm -rf spirv-llvm-translator
+  git clone --depth=1 --branch llvm_release_180 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git || fail "Clone failed"
 
   [[ -d "spirv-llvm-translator" ]] || fail "spirv-llvm-translator directory missing after clone"
 
