@@ -41,10 +41,11 @@ patch_cmake_if_needed() {
   cd "$LLVM_PROJECT_DIR/libclc"
   if ! grep -q "find_package(SPIRV-Tools" CMakeLists.txt; then
     log "Patching CMakeLists.txt for SPIRV-Tools..."
-    sed -i '2i\
+    sed -i '/project(libclc)/a\
+set(CMAKE_PREFIX_PATH "'"$PREFIX/lib/cmake"'")\n\
 find_package(SPIRV-Tools REQUIRED CONFIG)\n\
 set(SPIRV-Tools_INCLUDE_DIR "'"$PREFIX"'/include")\n\
-set(SPIRV-Tools_LIBRARY "'"$PREFIX"'/lib/libSPIRV-Tools.a")\n' CMakeLists.txt
+set(SPIRV-Tools_LIBRARY "'"$PREFIX"'/lib/libSPIRV-Tools.a")' CMakeLists.txt
   fi
 }
 
@@ -65,9 +66,7 @@ build_with_flags() {
   cmake -S "$LLVM_PROJECT_DIR/libclc" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_CONFIG="$LLVM_CONFIG" \
-    -DCMAKE_PREFIX_PATH="$PREFIX;$PREFIX/lib;$PREFIX/lib/cmake" \
-    -DSPIRV-Tools_DIR="$PREFIX/lib/cmake/SPIRV-Tools"
+    -DLLVM_CONFIG="$LLVM_CONFIG"
 
   cmake --build "$BUILD_DIR" -- -j"$(nproc)"
 }
