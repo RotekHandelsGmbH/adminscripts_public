@@ -10,11 +10,6 @@ PROFILE_DIR="$ROOT/pgo-profile"
 BUILD_DIR_GEN="$ROOT/build-gen"
 BUILD_DIR_USE="$ROOT/build-use"
 
-# === Force GCC ===
-log "🛠️ Forcing GCC as the compiler"
-export CC=gcc
-export CXX=g++
-
 # Aggressive Optimization Flags
 PROFILE_FLAG=""
 export CFLAGS="-O3 -march=native -mtune=native -flto $PROFILE_FLAG -fomit-frame-pointer -fPIC"
@@ -32,6 +27,11 @@ warn()   { echo -e "${YELLOW}⚠️ [WARN]${RESET} $1"; }
 success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
 fail()   { error "$1"; exit 1; }
+
+# === Force GCC ===
+log "🛠️ Forcing GCC as the compiler"
+export CC=gcc
+export CXX=g++
 
 # === BUILD FUNCTIONS ===
 
