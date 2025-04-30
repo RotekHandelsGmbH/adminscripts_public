@@ -4,7 +4,7 @@ set -euo pipefail
 # === CONFIGURATION ===
 INSTALL_PREFIX="/opt/lua-5.4"
 TMP_DIR="/tmp/lua-54-build"
-LUA_REPO_URL="https://gitlab.com/lua/lua.git"
+LUA_BASE_URL="https://www.lua.org/ftp"
 
 # === Helper Functions ===
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; RESET='\033[0m'
@@ -24,34 +24,39 @@ export CFLAGS="-Ofast -march=native -mtune=native -flto -fprofile-generate -fomi
 export CXXFLAGS="$CFLAGS"
 export LDFLAGS="-Wl,-O3 -flto -fprofile-generate"
 
-# === STEP 1: Get Latest 5.4.x Tag from Git ===
-detect_latest_54_tag() {
-  log "🔍 Cloning Lua repo and detecting latest 5.4.x tag"
-  rm -rf "$TMP_DIR"
-  git clone --quiet --mirror "$LUA_REPO_URL" "$TMP_DIR/lua.git" || fail "Failed to clone Lua repo"
-
-  cd "$TMP_DIR"
-  local tag
-  tag=$(git --git-dir=lua.git tag -l | grep -E "^v?5\.4(\.[0-9]+)?$" | sort -V | tail -n1)
-  [[ -n "$tag" ]] || fail "No 5.4.x tags found"
-  echo "$tag"
+# === STEP 1: Detect Latest Lua 5.4.x Tarball ===
+detect_latest_tarball() {
+  log "🔍 Detecting latest Lua 5.4.x tarball from $LUA_BASE_URL"
+  local listing candidates latest
+  listing=$(curl -fs "$LUA_BASE_URL/") || fail "Failed to fetch tarball listing"
+  candidates=$(printf "%s" "$listing" | grep -Eo 'lua-5\.4\.[0-9]+\.tar\.gz' | sort -V | uniq)
+  latest=$(echo "$candidates" | tail -n1)
+  [[ -n "$latest" ]] || fail "No Lua 5.4.x tarball found"
+  echo "$latest"
 }
 
-# === STEP 2: Checkout, Build and Install ===
-install_lua_from_git_tag() {
-  local tag="$1"
-  log "📥 Checking out Lua $tag"
+# === STEP 2: Download, Build, PGO Optimize, Install ===
+install_lua_from_tarball() {
+  local tarball="$1"
+  local release="${tarball%.tar.gz}"
+  local url="$LUA_BASE_URL/$tarball"
 
-  git clone --quiet "$TMP_DIR/lua.git" "$TMP_DIR/lua"
-  cd "$TMP_DIR/lua"
-  git checkout --quiet "$tag" || fail "Failed to checkout tag $tag"
+  log "📥 Downloading $tarball"
+  rm -rf "$TMP_DIR"
+  mkdir -p "$TMP_DIR"
+  cd "$TMP_DIR"
+  curl -fLO "$url" || fail "Failed to download $tarball"
+
+  log "📦 Extracting $tarball"
+  tar -xzf "$tarball"
+  cd "$release"
 
   log "🛠️  Building with profiling instrumentation (first pass)"
   make clean >/dev/null 2>&1 || true
   make linux -j"$(nproc)" || fail "Profile-gen build failed"
 
   log "🏃 Running Lua to generate profile data"
-  "$TMP_DIR/lua/src/lua" -e "for i=1,1e6 do local x=math.sin(i) end"
+  ./src/lua -e "for i=1,1e6 do local x=math.sin(i) end"
 
   log "🔁 Rebuilding with profile-optimized flags"
   export CFLAGS="-Ofast -march=native -mtune=native -flto -fprofile-use -fomit-frame-pointer -fPIC"
@@ -67,11 +72,11 @@ install_lua_from_git_tag() {
   sudo ln -sf "$INSTALL_PREFIX/bin/lua"  /usr/local/bin/lua54
   sudo ln -sf "$INSTALL_PREFIX/bin/luac" /usr/local/bin/luac54
 
-  log "✅ Lua ${tag#v} installed under $INSTALL_PREFIX"
+  log "✅ Lua ${release#lua-} installed under $INSTALL_PREFIX"
   "$INSTALL_PREFIX/bin/lua" -v
 }
 
 # === MAIN ===
-log "🚀 Starting Lua 5.4.x install from Git tags..."
-tag=$(detect_latest_54_tag | tail -n1 | tr -d '[:space:]')
-install_lua_from_git_tag "$tag"
+log "🚀 Starting Lua 5.4.x install from tarball..."
+tarball=$(detect_latest_tarball)
+install_lua_from_tarball "$tarball"
