@@ -62,6 +62,8 @@ function run_profiling_workload() {
 }
 
 function install_final_build() {
+  log "🧹 Removing existing install directory: $PREFIX"
+  sudo rm -rf "$PREFIX"
   sudo cmake --install "$BUILD_DIR_USE"
 }
 
