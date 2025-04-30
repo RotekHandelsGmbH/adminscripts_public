@@ -63,7 +63,7 @@ for disk in /sys/block/sd*; do
     linkspeed=""
 
     smartinfo=$(smartctl -i "$device" 2>/dev/null)
-    protocol=$(echo "$smartinfo" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/(current:.*)//' | sed 's/^[ \t]*//')
+    protocol=$(echo "$smartinfo" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/(current:.*)//' | sed 's/[[:space:]]*$//' | sed 's/^[[:space:]]*//')
     linkspeed=$(echo "$smartinfo" | grep -oP 'current:\s*\K[^)]+' | head -1)
     [[ -z "$linkspeed" ]] && linkspeed=$(echo "$smartinfo" | grep -oP 'SATA.*,\s*\K[0-9.]+ Gb/s' | head -1)
     serial=$(echo "$smartinfo" | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
