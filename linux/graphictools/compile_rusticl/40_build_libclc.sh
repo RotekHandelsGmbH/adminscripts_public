@@ -36,6 +36,19 @@ fetch_repo() {
   fi
 }
 
+# === Patch CMakeLists.txt to add SPIRV-Tools_DIR ===
+patch_cmake_if_needed() {
+  cd "$LLVM_PROJECT_DIR/libclc"
+
+  if ! grep -q "find_package(SPIRV-Tools" CMakeLists.txt; then
+    log "Patching CMakeLists.txt to locate SPIRV-Tools early..."
+
+    # Inject after project(libclc)
+    sed -i '/^project(libclc)/a\
+set(SPIRV-Tools_DIR "'"$PREFIX"'/lib/cmake/SPIRV-Tools")\nfind_package(SPIRV-Tools REQUIRED CONFIG)' CMakeLists.txt
+  fi
+}
+
 # === Build Function ===
 build_with_flags() {
   local BUILD_DIR=$1
@@ -53,9 +66,7 @@ build_with_flags() {
   cmake -S "$LLVM_PROJECT_DIR/libclc" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_CONFIG="$LLVM_CONFIG" \
-    -DSPIRV-Tools_DIR="$PREFIX/lib/cmake/SPIRV-Tools" \
-    -DCMAKE_PREFIX_PATH="$PREFIX;$PREFIX/lib;$PREFIX/lib/cmake"
+    -DLLVM_CONFIG="$LLVM_CONFIG"
 
   cmake --build "$BUILD_DIR" -- -j"$(nproc)"
 }
@@ -95,6 +106,7 @@ install_final_build() {
 log "🚀 Starting 2-pass PGO build for libclc..."
 
 fetch_repo
+patch_cmake_if_needed
 
 log "🔁 First pass: -fprofile-generate"
 build_with_flags "$BUILD_GEN" "-fprofile-generate=$PROFILE_DIR" "Generate"
