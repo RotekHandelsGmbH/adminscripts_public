@@ -19,7 +19,6 @@ CMAKE_COMMON_FLAGS=(
   -DCMAKE_INSTALL_PREFIX="$PREFIX"
   -DPython3_EXECUTABLE="$PYTHON"
   -DSPIRV_WERROR=OFF
-  -DSPIRV_TOOLS_INSTALL_CMAKE_CONFIG=ON
 )
 
 # === COLORS & LOGGING ===
@@ -45,6 +44,34 @@ activate_virtualenv() {
   source "$VENV/bin/activate"
 }
 
+patch_cmake_config_install() {
+  log "🩹 Patching SPIRV-Tools CMakeLists.txt to install CMake config..."
+  cat >> "$ROOT/CMakeLists.txt" <<'EOF'
+
+# === BEGIN: Injected config install ===
+include(CMakePackageConfigHelpers)
+set(SPIRV_TOOLS_CMAKE_CONFIG_DIR "\${CMAKE_INSTALL_LIBDIR}/cmake/SPIRV-Tools")
+
+configure_package_config_file(
+  "\${CMAKE_CURRENT_SOURCE_DIR}/cmake/SPIRV-ToolsConfig.cmake.in"
+  "\${CMAKE_CURRENT_BINARY_DIR}/SPIRV-ToolsConfig.cmake"
+  INSTALL_DESTINATION "\${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
+)
+
+install(FILES
+  "\${CMAKE_CURRENT_BINARY_DIR}/SPIRV-ToolsConfig.cmake"
+  DESTINATION "\${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
+)
+
+install(EXPORT SPIRV-ToolsTargets
+  FILE SPIRV-ToolsTargets.cmake
+  NAMESPACE SPIRV-Tools::
+  DESTINATION "\${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
+)
+# === END: Injected config install ===
+EOF
+}
+
 fetch_repo() {
   if [[ ! -d "$ROOT/.git" ]]; then
     log "📥 Cloning SPIRV-Tools repository into $ROOT..."
@@ -60,6 +87,8 @@ fetch_repo() {
 
   curl -sSL https://patch-diff.githubusercontent.com/raw/KhronosGroup/SPIRV-Tools/pull/5534.patch -o 5534.patch
   git apply 5534.patch || warn "Patch may already be applied"
+
+  patch_cmake_config_install
 }
 
 build_with_flags() {
