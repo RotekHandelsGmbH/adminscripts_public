@@ -20,7 +20,7 @@ fail()   { error "$1"; exit 1; }
 log "🛠️ Setting compiler and linker flags for aggressive performance optimization with PGO"
 export CC=gcc
 export CXX=g++
-export CFLAGS="-Ofast -march=native -mtune=native -flto -fprofile-generate -fomit-frame-pointer -fPIC"
+export CFLAGS="-O3 -march=native -mtune=native -flto -fprofile-generate -fomit-frame-pointer -fPIC"
 export CXXFLAGS="$CFLAGS"
 export LDFLAGS="-Wl,-O3 -flto -fprofile-generate"
 
