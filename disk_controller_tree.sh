@@ -1,35 +1,21 @@
 #!/bin/bash
+
 set -e
 
-# Display Header
-print_header() {
-    echo -e "
-╔════════════════════════════════════════════════════════════════════╗
-║ 🧩  Disk-to-Controller Tree Visualizer                              ║
-║ 👤  Author : bitranox                                               ║
-║ 🏛️  License: MIT                                                    ║
-║ 💾  Shows disks grouped by controller with model, size, interface,  ║
-║     serial, and link speed                                         ║
-╚════════════════════════════════════════════════════════════════════╝
-"
-}
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BOLD_GREEN='\033[1;32m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-# Color Setup
-setup_colors() {
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    BOLD_GREEN='\033[1;32m'
-    BLUE='\033[0;34m'
-    CYAN='\033[0;36m'
-    YELLOW='\033[1;33m'
-    NC='\033[0m'
-}
+REQUIRED_PKGS=(smartmontools nvme-cli jq)
+MISSING=()
 
-# Install missing required packages
-check_dependencies() {
-    REQUIRED_PKGS=(smartmontools nvme-cli)
-    MISSING=()
-
+# Function to check and install required packages
+check_and_install_packages() {
     for pkg in "${REQUIRED_PKGS[@]}"; do
         if ! dpkg -s "$pkg" >/dev/null 2>&1; then
             MISSING+=("$pkg")
@@ -44,7 +30,20 @@ check_dependencies() {
     fi
 }
 
-# Extract storage controller info
+# Function to display the header
+display_header() {
+    echo -e "
+╔════════════════════════════════════════════════════════════════════╗
+║ 🧩  Disk-to-Controller Tree Visualizer                              ║
+║ 👤  Author : bitranox                                               ║
+║ 🏛️  License: MIT                                                    ║
+║ 💾  Shows disks grouped by controller with model, size, interface,  ║
+║     serial, link speed, SMART status, and temperature              ║
+╚════════════════════════════════════════════════════════════════════╝
+"
+}
+
+# Function to get storage controller information
 get_storage_controller() {
     local devpath="$1"
     for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | tac); do
@@ -57,143 +56,140 @@ get_storage_controller() {
     echo "Unknown Controller"
 }
 
-# Format SMART health status
-format_smart_health() {
-    local status="$1"
-    if [[ "$status" =~ ^(PASSED|OK|0)$ ]]; then
+# Function to get SMART health status
+get_smart_health() {
+    local device="$1"
+    local smart_health_raw
+    smart_health_raw=$(smartctl -H "$device" 2>/dev/null | grep -iE 'SMART.*(result|assessment)' | awk -F: '{print $2}' | xargs)
+    if [[ "$smart_health_raw" =~ ^(PASSED|OK)$ ]]; then
         echo "❤️ SMART: ✅"
-    elif [[ -z "$status" ]]; then
+    elif [[ -z "$smart_health_raw" ]]; then
         echo "❤️ SMART: ❓"
     else
         echo -e "${RED}❤️ SMART: ⚠️${NC}"
     fi
 }
 
-# Get drive temperature
-get_drive_temperature() {
+# Function to get temperature for SATA/SAS drives
+get_sata_temperature() {
     local device="$1"
-    local type="$2"
-    local temp=""
-
-    if [[ "$type" == "sata" ]]; then
-        temp=$(smartctl -A "$device" 2>/dev/null | awk '/[Tt]emp/ && NF >= 10 {print $10; exit}')
-    elif [[ "$type" == "nvme" ]]; then
-        # Look for "temperature" field in output
-        temp=$(nvme smart-log "$device" 2>/dev/null | awk '/^temperature[^:]*:/ {gsub(/[^0-9]/,"",$2); print $2; exit}')
-    fi
-
-    if [[ "$temp" =~ ^[0-9]+$ ]]; then
+    local temp
+    temp=$(smartctl -A "$device" 2>/dev/null | awk '/Temperature_Celsius|Temperature/ {print $10}' | head -n1)
+    if [[ -n "$temp" && "$temp" =~ ^[0-9]+$ ]]; then
         echo "🌡️ ${temp}°C"
     else
         echo "🌡️ N/A"
     fi
 }
 
-# Color output based on link speed
-color_link_speed() {
-    local link="$1"
-    if [[ "$link" =~ ^(12|16|32|8)\.0 ]]; then
-        echo -e "${BOLD_GREEN}🧩 link=$link${NC}"
-    elif [[ "$link" == "6.0 Gb/s" || "$link" =~ 6\.0 ]]; then
-        echo -e "${GREEN}🧩 link=$link${NC}"
-    elif [[ "$link" == "3.0 Gb/s" || "$link" =~ 3\.0 ]]; then
-        echo -e "${YELLOW}🧩 link=$link${NC}"
+# Function to get temperature for NVMe drives
+get_nvme_temperature() {
+    local device="$1"
+    local temp
+    temp=$(nvme smart-log "$device" 2>/dev/null | grep -i "^temperature" | awk -F: '{print $2}' | xargs | grep -o '[0-9]\+')
+    if [[ -n "$temp" ]]; then
+        echo "🌡️ ${temp}°C"
     else
-        echo "🧩 link=$link"
+        echo "🌡️ N/A"
     fi
 }
 
-# Process SATA/SAS drives
-process_sata_disks() {
+# Function to process SATA/SAS drives
+process_sata_drives() {
+    declare -A CONTROLLER_DISKS
     for disk in /sys/block/sd*; do
         diskname=$(basename "$disk")
         devpath="$disk/device"
         device="/dev/$diskname"
-        controller=$(get_storage_controller "$devpath")
 
+        controller=$(get_storage_controller "$devpath")
         model=$(cat "$disk/device/model" 2>/dev/null)
         vendor=$(cat "$disk/device/vendor" 2>/dev/null)
         size=$(lsblk -dn -o SIZE "$device")
-        serial=$(smartctl -i "$device" | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
-        firmware=$(smartctl -i "$device" | grep -i 'Firmware Version' | awk -F: '{print $2}' | xargs)
+        serial=$(smartctl -i "$device" 2>/dev/null | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
+        firmware=$(smartctl -i "$device" 2>/dev/null | grep -i 'Firmware Version' | awk -F: '{print $2}' | xargs)
 
-        smart_health_raw=$(smartctl -H "$device" | grep -iE 'SMART.*(result|assessment)' | awk -F: '{print $2}' | xargs)
-        smart_health=$(format_smart_health "$smart_health_raw")
-        temperature=$(get_drive_temperature "$device" "sata")
-
-        protocol=$(smartctl -i "$device" | grep -E "Transport protocol|SATA Version" | sed -n 's/.*SATA Version is:[[:space:]]*\([^ ]*\).*/\1/p')
+        protocol=$(smartctl -i "$device" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/^.*SATA Version is:[[:space:]]*//' | sed 's/(current:.*)//' | sed 's/[[:space:]]*$//')
         linkspeed=$(smartctl -i "$device" | grep -oP 'current:\s*\K[^)]+' | head -1)
         [[ -z "$linkspeed" ]] && linkspeed=$(smartctl -i "$device" | grep -oP 'SATA.*,[[:space:]]*\K[0-9.]+ Gb/s' | head -1)
 
-        serial=${serial:-unknown}
-        firmware=${firmware:-unknown}
-        protocol=${protocol:-unknown}
-        linkspeed=${linkspeed:-unknown}
+        [[ -z "$serial" ]] && serial="unknown"
+        [[ -z "$firmware" ]] && firmware="unknown"
+        [[ -z "$protocol" ]] && protocol="unknown"
+        [[ -z "$linkspeed" ]] && linkspeed="unknown"
 
-        linkspeed_display=$(color_link_speed "$linkspeed")
+        if [[ "$linkspeed" =~ ^(12|16|32|8)\.0 ]]; then
+            linkspeed_display="${BOLD_GREEN}🧩 link=$linkspeed${NC}"
+        elif [[ "$linkspeed" == "6.0 Gb/s" ]]; then
+            linkspeed_display="${GREEN}🧩 link=$linkspeed${NC}"
+        elif [[ "$linkspeed" == "3.0 Gb/s" ]]; then
+            linkspeed_display="${YELLOW}🧩 link=$linkspeed${NC}"
+        else
+            linkspeed_display="🧩 link=$linkspeed"
+        fi
+
+        smart_health=$(get_smart_health "$device")
+        temperature=$(get_sata_temperature "$device")
+
         disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, $smart_health, $temperature, 🔢 SN: $serial, 🔧 FW: $firmware"
         CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
     done
+
+    echo "${CONTROLLER_DISKS[@]}"
 }
 
-# Process NVMe drives
-process_nvme_disks() {
+# Function to process NVMe drives
+process_nvme_drives() {
+    declare -A CONTROLLER_DISKS
     for nvdev in /dev/nvme*n1; do
         [[ -b "$nvdev" ]] || continue
         sysdev="/sys/block/$(basename "$nvdev")/device"
         controller=$(get_storage_controller "$sysdev")
+        [[ -z "$controller" ]] && controller="Unknown Controller"
 
         idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
-        [[ -z "$idctrl" ]] && echo -e "${RED}⚠️  Failed to read NVMe info from $nvdev — skipping.${NC}" && continue
+        if [[ -z "$idctrl" ]]; then
+            echo -e "${RED}⚠️  Failed to read NVMe info from $nvdev — skipping.${NC}"
+            continue
+        fi
 
         model=$(echo "$idctrl" | grep -i "mn" | head -1 | awk -F: '{print $2}' | xargs)
         vendorid=$(echo "$idctrl" | grep -i "vid" | head -1 | awk -F: '{print $2}' | xargs)
+        vendor="0x$vendorid"
         serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
         firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
         size=$(lsblk -dn -o SIZE "$nvdev")
 
-        smart_health_val=$(nvme smart-log "$nvdev" | grep -i 'overall' | awk -F: '{print $2}' | xargs)
-        smart_health=$(format_smart_health "$smart_health_val")
-        temperature=$(get_drive_temperature "$nvdev" "nvme")
+        smart_health_val=$(nvme smart-log "$nvdev" 2>/dev/null | grep -i 'overall' | awk -F: '{print $2}' | xargs)
+        if [[ "$smart_health_val" == "0" ]]; then
+            smart_health="❤️ SMART: ✅"
+        elif [[ -z "$smart_health_val" ]]; then
+            smart_health="❤️ SMART: ❓"
+        else
+            smart_health="${RED}❤️ SMART: ⚠️${NC}"
+        fi
+
+        temperature=$(get_nvme_temperature "$nvdev")
+
+        [[ -z "$serial" ]] && serial="unknown"
+        [[ -z "$firmware" ]] && firmware="unknown"
+        [[ -z "$size" ]] && size="unknown"
 
         width=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_width" 2>/dev/null || echo "")
         speed=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_speed" 2>/dev/null || echo "")
 
-        [[ -z "$width" || -z "$speed" ]] && {
+        if [[ -z "$width" || -z "$speed" ]]; then
             width=$(echo "$idctrl" | grep -i "PCIe Link Width" | awk -F: '{print $2}' | xargs)
             speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
-        }
+        fi
 
-        link="PCIe ${speed:-unknown} x${width:-unknown}"
-        link_display=$(color_link_speed "$link")
+        if [[ -n "$speed" && -n "$width" ]]; then
+            link="PCIe $speed x$width"
+        else
+            link="PCIe (unknown)"
+        fi
 
-        disk_info="${GREEN}💾 $nvdev${NC}  (0x$vendorid $model, $size, NVMe, $link_display, $smart_health, $temperature, 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}"
-        CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
-    done
-}
+        if [[ "$link" =~ (16\.0|32\.0|8\.0|12\.0) ]]; then
 
-# Print final results
-print_output() {
-    echo -e "${BLUE}📤 Preparing output...${NC}"
-    echo -e "${CYAN}=============================="
-    echo -e " Disk-to-Controller Tree (SATA/SAS/NVMe + Serial + Link Speed)"
-    echo -e "==============================${NC}\n"
+::contentReference[oaicite:5]{index=5}
 
-    for ctrl in "${!CONTROLLER_DISKS[@]}"; do
-        echo -e "${CYAN}🎯 $ctrl${NC}"
-        printf "${CONTROLLER_DISKS[$ctrl]}" | while read -r line; do
-            [[ -n "$line" ]] && echo -e "  └── $line"
-        done
-        echo ""
-    done
-}
-
-### Main Execution ###
-declare -A CONTROLLER_DISKS
-
-print_header
-setup_colors
-check_dependencies
-process_sata_disks
-process_nvme_disks
-print_output
