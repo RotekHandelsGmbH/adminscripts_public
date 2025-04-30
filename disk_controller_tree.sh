@@ -57,6 +57,46 @@ get_storage_controller() {
     echo "Unknown Controller"
 }
 
+# Get SMART health formatted
+format_smart_health() {
+    local status="$1"
+    if [[ "$status" =~ ^(PASSED|OK|0)$ ]]; then
+        echo "❤️ SMART: ✅"
+    elif [[ -z "$status" ]]; then
+        echo "❤️ SMART: ❓"
+    else
+        echo -e "${RED}❤️ SMART: ⚠️${NC}"
+    fi
+}
+
+# Get drive temperature
+get_drive_temperature() {
+    local device="$1"
+    local type="$2" # sata or nvme
+
+    if [[ "$type" == "sata" ]]; then
+        temp=$(smartctl -A "$device" | awk '/Temperature_Celsius|Temperature_Internal/ {print $10}' | head -1)
+    else
+        temp=$(nvme smart-log "$device" 2>/dev/null | awk '/temperature/ {print $3}' | head -1)
+    fi
+
+    [[ -n "$temp" && "$temp" =~ ^[0-9]+$ ]] && echo "🌡️ ${temp}°C" || echo "🌡️ N/A"
+}
+
+# Color output based on link speed
+color_link_speed() {
+    local link="$1"
+    if [[ "$link" =~ ^(12|16|32|8)\.0 ]]; then
+        echo -e "${BOLD_GREEN}🧩 link=$link${NC}"
+    elif [[ "$link" == "6.0 Gb/s" || "$link" =~ 6\.0 ]]; then
+        echo -e "${GREEN}🧩 link=$link${NC}"
+    elif [[ "$link" == "3.0 Gb/s" || "$link" =~ 3\.0 ]]; then
+        echo -e "${YELLOW}🧩 link=$link${NC}"
+    else
+        echo "🧩 link=$link"
+    fi
+}
+
 # Process SATA/SAS drives
 process_sata_disks() {
     for disk in /sys/block/sd*; do
@@ -73,6 +113,7 @@ process_sata_disks() {
 
         smart_health_raw=$(smartctl -H "$device" | grep -iE 'SMART.*(result|assessment)' | awk -F: '{print $2}' | xargs)
         smart_health=$(format_smart_health "$smart_health_raw")
+        temperature=$(get_drive_temperature "$device" "sata")
 
         protocol=$(smartctl -i "$device" | grep -E "Transport protocol|SATA Version" | sed -n 's/.*SATA Version is:[[:space:]]*\([^ ]*\).*/\1/p')
         linkspeed=$(smartctl -i "$device" | grep -oP 'current:\s*\K[^)]+' | head -1)
@@ -84,7 +125,7 @@ process_sata_disks() {
         linkspeed=${linkspeed:-unknown}
 
         linkspeed_display=$(color_link_speed "$linkspeed")
-        disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, $smart_health, 🔢 SN: $serial, 🔧 FW: $firmware"
+        disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, $smart_health, $temperature, 🔢 SN: $serial, 🔧 FW: $firmware"
         CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
     done
 }
@@ -107,6 +148,7 @@ process_nvme_disks() {
 
         smart_health_val=$(nvme smart-log "$nvdev" | grep -i 'overall' | awk -F: '{print $2}' | xargs)
         smart_health=$(format_smart_health "$smart_health_val")
+        temperature=$(get_drive_temperature "$nvdev" "nvme")
 
         width=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_width" 2>/dev/null || echo "")
         speed=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_speed" 2>/dev/null || echo "")
@@ -119,35 +161,9 @@ process_nvme_disks() {
         link="PCIe ${speed:-unknown} x${width:-unknown}"
         link_display=$(color_link_speed "$link")
 
-        disk_info="${GREEN}💾 $nvdev${NC}  (0x$vendorid $model, $size, NVMe, $link_display, $smart_health, 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}"
+        disk_info="${GREEN}💾 $nvdev${NC}  (0x$vendorid $model, $size, NVMe, $link_display, $smart_health, $temperature, 🔢 SN: ${serial:-unknown}, 🔧 FW: ${firmware:-unknown}"
         CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
     done
-}
-
-# Format SMART health status
-format_smart_health() {
-    local status="$1"
-    if [[ "$status" =~ ^(PASSED|OK|0)$ ]]; then
-        echo "❤️ SMART: ✅"
-    elif [[ -z "$status" ]]; then
-        echo "❤️ SMART: ❓"
-    else
-        echo -e "${RED}❤️ SMART: ⚠️${NC}"
-    fi
-}
-
-# Color output based on link speed
-color_link_speed() {
-    local link="$1"
-    if [[ "$link" =~ ^(12|16|32|8)\.0 ]]; then
-        echo -e "${BOLD_GREEN}🧩 link=$link${NC}"
-    elif [[ "$link" == "6.0 Gb/s" || "$link" =~ 6\.0 ]]; then
-        echo -e "${GREEN}🧩 link=$link${NC}"
-    elif [[ "$link" == "3.0 Gb/s" || "$link" =~ 3\.0 ]]; then
-        echo -e "${YELLOW}🧩 link=$link${NC}"
-    else
-        echo "🧩 link=$link"
-    fi
 }
 
 # Print final results
