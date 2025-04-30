@@ -39,7 +39,7 @@ detect_latest_tarball() {
 install_lua_from_tarball() {
   local tarball="$1"
   local release="${tarball%.tar.gz}"
-  local url="$LUA_BASE_URL/$tarball"
+  local url="${LUA_BASE_URL}/${tarball}"
 
   log "📥 Downloading $tarball from $url"
   rm -rf "$TMP_DIR"
