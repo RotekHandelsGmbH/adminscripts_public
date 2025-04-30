@@ -68,11 +68,11 @@ for disk in /sys/block/sd*; do
 
     smart_health_raw=$(smartctl -H "$device" 2>/dev/null | grep -iE 'SMART.*(result|assessment)' | awk -F: '{print $2}' | xargs)
     if [[ "$smart_health_raw" =~ ^(PASSED|OK)$ ]]; then
-        smart_health="❤️SMART: ✅"
+        smart_health="❤️ SMART: ✅"
     elif [[ -z "$smart_health_raw" ]]; then
-        smart_health="❤️SMART: ❓"
+        smart_health="❤️ SMART: ❓"
     else
-        smart_health="${RED}❤️SMART: ⚠️${NC}"
+        smart_health="${RED}❤️ SMART: ⚠️${NC}"
     fi
 
     protocol=$(smartctl -i "$device" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/^.*SATA Version is:[[:space:]]*//' | sed 's/(current:.*)//' | sed 's/[[:space:]]*$//')
