@@ -44,29 +44,42 @@ activate_virtualenv() {
   source "$VENV/bin/activate"
 }
 
+create_cmake_config_template() {
+  local config_dir="$ROOT/cmake"
+  local template_file="$config_dir/SPIRV-ToolsConfig.cmake.in"
+
+  log "🧩 Creating SPIRV-ToolsConfig.cmake.in template..."
+  mkdir -p "$config_dir"
+  cat > "$template_file" <<EOF
+@PACKAGE_INIT@
+
+include("\${CMAKE_CURRENT_LIST_DIR}/SPIRV-ToolsTargets.cmake")
+EOF
+}
+
 patch_cmake_config_install() {
   log "🩹 Patching SPIRV-Tools CMakeLists.txt to install CMake config..."
   cat >> "$ROOT/CMakeLists.txt" <<'EOF'
 
 # === BEGIN: Injected config install ===
 include(CMakePackageConfigHelpers)
-set(SPIRV_TOOLS_CMAKE_CONFIG_DIR "\${CMAKE_INSTALL_LIBDIR}/cmake/SPIRV-Tools")
+set(SPIRV_TOOLS_CMAKE_CONFIG_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/SPIRV-Tools")
 
 configure_package_config_file(
-  "\${CMAKE_CURRENT_SOURCE_DIR}/cmake/SPIRV-ToolsConfig.cmake.in"
-  "\${CMAKE_CURRENT_BINARY_DIR}/SPIRV-ToolsConfig.cmake"
-  INSTALL_DESTINATION "\${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SPIRV-ToolsConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/SPIRV-ToolsConfig.cmake"
+  INSTALL_DESTINATION "${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
 )
 
 install(FILES
-  "\${CMAKE_CURRENT_BINARY_DIR}/SPIRV-ToolsConfig.cmake"
-  DESTINATION "\${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
+  "${CMAKE_CURRENT_BINARY_DIR}/SPIRV-ToolsConfig.cmake"
+  DESTINATION "${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
 )
 
 install(EXPORT SPIRV-ToolsTargets
   FILE SPIRV-ToolsTargets.cmake
   NAMESPACE SPIRV-Tools::
-  DESTINATION "\${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
+  DESTINATION "${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
 )
 # === END: Injected config install ===
 EOF
@@ -87,8 +100,6 @@ fetch_repo() {
 
   curl -sSL https://patch-diff.githubusercontent.com/raw/KhronosGroup/SPIRV-Tools/pull/5534.patch -o 5534.patch
   git apply 5534.patch || warn "Patch may already be applied"
-
-  patch_cmake_config_install
 }
 
 build_with_flags() {
@@ -148,6 +159,8 @@ validate_install() {
 main() {
   activate_virtualenv
   fetch_repo
+  create_cmake_config_template
+  patch_cmake_config_install
 
   log "🔁 First pass: -fprofile-generate"
   build_with_flags "$BUILD_DIR_GEN" "-fprofile-generate=$PROFILE_DIR" "Generate"
