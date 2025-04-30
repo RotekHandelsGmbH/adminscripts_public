@@ -36,19 +36,6 @@ fetch_repo() {
   fi
 }
 
-# === Apply Patch to CMakeLists.txt if Required ===
-patch_cmake_if_needed() {
-  cd "$LLVM_PROJECT_DIR/libclc"
-  if ! grep -q "find_package(SPIRV-Tools" CMakeLists.txt; then
-    log "Patching CMakeLists.txt for SPIRV-Tools..."
-    sed -i '/project(libclc)/a\
-set(CMAKE_PREFIX_PATH "'"$PREFIX/lib/cmake"'")\n\
-find_package(SPIRV-Tools REQUIRED CONFIG)\n\
-set(SPIRV-Tools_INCLUDE_DIR "'"$PREFIX"'/include")\n\
-set(SPIRV-Tools_LIBRARY "'"$PREFIX"'/lib/libSPIRV-Tools.a")' CMakeLists.txt
-  fi
-}
-
 # === Build Function ===
 build_with_flags() {
   local BUILD_DIR=$1
@@ -66,7 +53,9 @@ build_with_flags() {
   cmake -S "$LLVM_PROJECT_DIR/libclc" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_CONFIG="$LLVM_CONFIG"
+    -DLLVM_CONFIG="$LLVM_CONFIG" \
+    -DSPIRV-Tools_DIR="$PREFIX/lib/cmake/SPIRV-Tools" \
+    -DCMAKE_PREFIX_PATH="$PREFIX;$PREFIX/lib;$PREFIX/lib/cmake"
 
   cmake --build "$BUILD_DIR" -- -j"$(nproc)"
 }
@@ -78,7 +67,6 @@ run_profiling_workload() {
   local WORK_DIR="$ROOT/profiling-kernels"
   mkdir -p "$WORK_DIR"
 
-  # Dummy LLVM IR
   cat > "$WORK_DIR/dummy.ll" <<EOF
 define i32 @add(i32 %a, i32 %b) {
   %sum = add i32 %a, %b
@@ -91,16 +79,9 @@ define i32 @main() {
 EOF
 
   local LLVM_BIN_DIR="$($LLVM_CONFIG --bindir)"
-  log "📦 Assembling IR to bitcode..."
   "$LLVM_BIN_DIR/llvm-as" "$WORK_DIR/dummy.ll" -o "$WORK_DIR/dummy.bc"
-
-  log "🛠️ Compiling bitcode to object with llc..."
   "$LLVM_BIN_DIR/llc" -filetype=obj "$WORK_DIR/dummy.bc" -o "$WORK_DIR/dummy.o"
-
-  log "📎 Linking with GCC..."
   gcc "$WORK_DIR/dummy.o" -o "$WORK_DIR/test_bin" || fail "Linking failed"
-
-  log "🚀 Running binary to trigger profiling..."
   "$WORK_DIR/test_bin" || true
 }
 
@@ -114,7 +95,6 @@ install_final_build() {
 log "🚀 Starting 2-pass PGO build for libclc..."
 
 fetch_repo
-patch_cmake_if_needed
 
 log "🔁 First pass: -fprofile-generate"
 build_with_flags "$BUILD_GEN" "-fprofile-generate=$PROFILE_DIR" "Generate"
