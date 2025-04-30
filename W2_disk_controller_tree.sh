@@ -68,7 +68,7 @@ for disk in /sys/block/sd*; do
     size=$(lsblk -dn -o SIZE "$device")
     serial=$(smartctl -i "$device" | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
     firmware=$(smartctl -i "$device" | grep -i 'Firmware Version' | awk -F: '{print $2}' | xargs)
-    smart_health=$(smartctl -H "$device" 2>/dev/null | grep -i 'SMART overall-health' | awk -F: '{print $2}' | xargs)
+    smart_health=$(smartctl -H "$device" 2>/dev/null | grep -i 'SMART overall-health self-assessment' | awk -F: '{print $2}' | xargs)
     if [[ "$smart_health" =~ ^(PASSED|OK)$ ]]; then
         smart_health="${GREEN}✔️ $smart_health${NC}"
     elif [[ -z "$smart_health" ]]; then
