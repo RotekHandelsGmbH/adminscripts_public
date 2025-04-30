@@ -95,10 +95,10 @@ echo -e "${BLUE}📦 Scanning NVMe drives...${NC}"
 # NVMe drives
 for nvdev in /dev/nvme*n1; do
     echo -e "${CYAN}🔎 Found NVMe device: $nvdev${NC}"
-    echo -e "${CYAN}🔎 Found NVMe device: $nvdev${NC}"
     [[ -b "$nvdev" ]] || continue
     sysdev="/sys/block/$(basename "$nvdev")/device"
     controller=$(get_storage_controller "$sysdev")
+    [[ -z "$controller" ]] && controller="Unknown Controller"
     echo -e "${CYAN}📌 Controller: $controller${NC}"
 
     idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
