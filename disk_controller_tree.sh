@@ -50,8 +50,7 @@ get_storage_controller() {
             return
         fi
     done
-    local first=$(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\\.[0-9]' | head -1)
-    echo "Unknown Controller at $first"
+    echo "Unknown Controller"
 }
 
 # SATA/SAS drives
@@ -118,13 +117,19 @@ for nvdev in /dev/nvme*n1; do
 
     idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
     model=$(echo "$idctrl" | grep -i "mn" | head -1 | awk -F: '{print $2}' | xargs)
-    vendor=$(echo "$idctrl" | grep -i "vid" | head -1 | awk -F: '{print $2}' | xargs)
+    vendorid=$(echo "$idctrl" | grep -i "vid" | head -1 | awk -F: '{print $2}' | xargs)
+    vendor="0x$vendorid"
     width=$(echo "$idctrl" | grep -i "PCIe Link Width" | awk -F: '{print $2}' | xargs)
     speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
     serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
     firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
-    link="PCIe $speed x$width"
     size=$(lsblk -dn -o SIZE "$nvdev")
+
+    if [[ -n "$speed" && -n "$width" ]]; then
+        link="PCIe $speed x$width"
+    else
+        link="PCIe (unknown)"
+    fi
 
     if [[ "$link" =~ (16\.0|32\.0|8\.0|12\.0) ]]; then
         link_display="${BOLD_GREEN}🧩 link=$link${NC}"
