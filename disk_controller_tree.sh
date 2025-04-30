@@ -68,11 +68,11 @@ for disk in /sys/block/sd*; do
 
     smart_health_raw=$(smartctl -H "$device" 2>/dev/null | grep -iE 'SMART.*(result|assessment)' | awk -F: '{print $2}' | xargs)
     if [[ "$smart_health_raw" =~ ^(PASSED|OK)$ ]]; then
-        smart_health="${GREEN}✔️${NC}"
+        smart_health="❤️SMART: ✅"
     elif [[ -z "$smart_health_raw" ]]; then
-        smart_health="❓"
+        smart_health="❤️SMART: ❓"
     else
-        smart_health="${RED}⚠️${NC}"
+        smart_health="${RED}❤️SMART: ⚠️${NC}"
     fi
 
     protocol=$(smartctl -i "$device" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/^.*SATA Version is:[[:space:]]*//' | sed 's/(current:.*)//' | sed 's/[[:space:]]*$//')
@@ -94,7 +94,7 @@ for disk in /sys/block/sd*; do
         linkspeed_display="🧩 link=$linkspeed"
     fi
 
-    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial, 🔧 FW: $firmware, ❤️SMART: $smart_health)"
+    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial, 🔧 FW: $firmware, $smart_health )"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
@@ -120,11 +120,11 @@ for nvdev in /dev/nvme*n1; do
 
     smart_health_val=$(nvme smart-log "$nvdev" 2>/dev/null | grep -i 'overall' | awk -F: '{print $2}' | xargs)
     if [[ "$smart_health_val" == "0" ]]; then
-        smart_health="${GREEN}✔️${NC}"
+        smart_health="❤️SMART: ✅"
     elif [[ -z "$smart_health_val" ]]; then
-        smart_health="❓"
+        smart_health="❤️SMART: ❓"
     else
-        smart_health="${RED}⚠️${NC}"
+        smart_health="${RED}❤️SMART: ⚠️${NC}"
     fi
 
     [[ -z "$serial" ]] && serial="unknown"
@@ -155,7 +155,7 @@ for nvdev in /dev/nvme*n1; do
         link_display="🧩 link=$link"
     fi
 
-    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial, 🔧 FW: $firmware, ❤️SMART: $smart_health)"
+    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial, 🔧 FW: $firmware, $smart_health )"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
