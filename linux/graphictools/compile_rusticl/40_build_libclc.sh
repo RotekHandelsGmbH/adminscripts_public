@@ -22,10 +22,10 @@ success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
 fail()   { error "$1"; exit 1; }
 
-# === Force Clang ===
-log "🛠️ Forcing Clang as the compiler"
-export CC=clang
-export CXX=clang++
+# === Force GCC ===
+log "🛠️ Using GCC as the compiler"
+export CC=gcc
+export CXX=g++
 
 function build_libclc_only() {
   log "Building libclc for LLVM ${LLVM_VERSION} natively..."
