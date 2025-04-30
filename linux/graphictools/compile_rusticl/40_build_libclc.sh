@@ -7,62 +7,60 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/libclc-build"
 LLVM_VERSION="18"
 LLVM_CONFIG="llvm-config-${LLVM_VERSION}"
 LLVM_PROJECT_DIR="$ROOT/llvm-project"
+PROFILE_DIR="$ROOT/profile-data"
+BUILD_GEN="$ROOT/build-gen"
+BUILD_USE="$ROOT/build-use"
 
 mkdir -p "$ROOT"
 
-# === Helper Functions (Colorful, Emoji, One-liners) ===
-
-# Color codes
+# === Color Log Functions ===
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; RESET='\033[0m'
-
 log()    { echo -e "\n${CYAN}ℹ️  [INFO]${RESET} $1\n"; }
 debug()  { echo -e "${BLUE}🐞 [DEBUG]${RESET} $1"; }
 warn()   { echo -e "${YELLOW}⚠️ [WARN]${RESET} $1"; }
 success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
-error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
+error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
 fail()   { error "$1"; exit 1; }
 
-# === Force GCC ===
+# === Compiler Setup ===
 log "🛠️ Using GCC as the compiler"
 export CC=gcc
 export CXX=g++
 
-function build_libclc_only() {
-  log "Building libclc for LLVM ${LLVM_VERSION} natively..."
-
+# === Clone Repo if Needed ===
+fetch_repo() {
   if [ ! -d "$LLVM_PROJECT_DIR" ]; then
     git clone --depth=1 --branch llvmorg-${LLVM_VERSION}.1.0 https://github.com/llvm/llvm-project.git "$LLVM_PROJECT_DIR" || fail "llvm-project clone failed"
   else
     log "Using existing llvm-project at $LLVM_PROJECT_DIR"
   fi
+}
 
+# === Apply Patch to CMakeLists.txt if Required ===
+patch_cmake_if_needed() {
   cd "$LLVM_PROJECT_DIR/libclc"
-
-  # === Patch CMakeLists.txt if necessary ===
   if ! grep -q "find_package(SPIRV-Tools" CMakeLists.txt; then
-    log "Patching CMakeLists.txt to explicitly require SPIRV-Tools..."
+    log "Patching CMakeLists.txt for SPIRV-Tools..."
     sed -i '2i\
 find_package(SPIRV-Tools REQUIRED CONFIG)\nset(SPIRV-Tools_INCLUDE_DIR "'"$PREFIX"'/include")\nset(SPIRV-Tools_LIBRARY "'"$PREFIX"'/lib/libSPIRV-Tools.a")\n' CMakeLists.txt
-    debug "✅ Patch inserted into CMakeLists.txt"
   fi
+}
 
-  # === Environment Setup ===
-  export PATH="$PREFIX/bin:$PATH"
-  export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib/x86_64-linux-gnu/pkgconfig"
-  export CMAKE_PREFIX_PATH="${PREFIX}/lib/cmake"
+# === Build Function ===
+build_with_flags() {
+  local BUILD_DIR=$1
+  local PROFILE_FLAG=$2
+  local TYPE_LABEL=$3
 
-  debug "PATH: $PATH"
-  debug "PKG_CONFIG_PATH: $PKG_CONFIG_PATH"
-  debug "llvm-config version: $($LLVM_CONFIG --version)"
-  debug "Checking spirv-as: $(command -v spirv-as || echo 'not found')"
-  debug "Checking llvm-spirv: $(command -v llvm-spirv || echo 'not found')"
-  debug "SPIRV-Tools version: $(pkg-config --modversion SPIRV-Tools || echo 'not found')"
-  debug "SPIRV-ToolsConfig.cmake exists: $(ls -l $PREFIX/lib/cmake/SPIRV-Tools/SPIRV-ToolsConfig.cmake || echo '❌ missing')"
-  debug "Listing CMake config files:"
-  find "$PREFIX/lib/cmake" -name '*.cmake'
+  log "⚙️ Building ($TYPE_LABEL pass)..."
+  rm -rf "$BUILD_DIR"
+  mkdir -p "$BUILD_DIR"
 
-  # === CMake Build ===
-  cmake -S . -B build -G Ninja \
+  export CFLAGS="-O3 -march=native -mtune=native -flto $PROFILE_FLAG -fomit-frame-pointer -fPIC"
+  export CXXFLAGS="$CFLAGS"
+  export LDFLAGS="-Wl,-O3 -flto $PROFILE_FLAG"
+
+  cmake -S "$LLVM_PROJECT_DIR/libclc" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_CONFIG="$LLVM_CONFIG" \
@@ -74,11 +72,32 @@ find_package(SPIRV-Tools REQUIRED CONFIG)\nset(SPIRV-Tools_INCLUDE_DIR "'"$PREFI
     -DSPIRV-Tools_DIR="$PREFIX/lib/cmake/SPIRV-Tools" \
     -DLLVM_SPIRV="$PREFIX/bin/llvm-spirv"
 
-  cmake --build build -- -j"$(nproc)"
-  sudo cmake --install build
-
-  log "✅ libclc build complete and installed to $PREFIX"
+  cmake --build "$BUILD_DIR" -- -j"$(nproc)"
 }
 
-# === MAIN ===
-build_libclc_only
+# === Run Profiling Workload (Dummy) ===
+run_profiling_workload() {
+  log "⚡ Running profiling workload..."
+  # Replace this with actual usage (e.g. compiling kernels)
+  find "$BUILD_GEN" -type f -executable -exec {} \; || true
+}
+
+# === Install Final Build ===
+install_final_build() {
+  sudo cmake --install "$BUILD_USE"
+  success "libclc installed to $PREFIX"
+}
+
+# === MAIN BUILD FLOW ===
+log "🚀 Starting 2-pass PGO build for libclc..."
+
+fetch_repo
+patch_cmake_if_needed
+
+log "🔁 First pass: -fprofile-generate"
+build_with_flags "$BUILD_GEN" "-fprofile-generate=$PROFILE_DIR" "Generate"
+run_profiling_workload
+
+log "🎯 Second pass: -fprofile-use"
+build_with_flags "$BUILD_USE" "-fprofile-use=$PROFILE_DIR -fprofile-correction -Wno-missing-profile" "Use"
+install_final_build
