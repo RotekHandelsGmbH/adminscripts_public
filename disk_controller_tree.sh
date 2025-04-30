@@ -57,7 +57,7 @@ get_storage_controller() {
     echo "Unknown Controller"
 }
 
-# Get SMART health formatted
+# Format SMART health status
 format_smart_health() {
     local status="$1"
     if [[ "$status" =~ ^(PASSED|OK|0)$ ]]; then
@@ -69,18 +69,23 @@ format_smart_health() {
     fi
 }
 
-# Get drive temperature
+# Get drive temperature (robust across vendors)
 get_drive_temperature() {
     local device="$1"
     local type="$2" # sata or nvme
+    local temp=""
 
     if [[ "$type" == "sata" ]]; then
-        temp=$(smartctl -A "$device" | awk '/Temperature_Celsius|Temperature_Internal/ {print $10}' | head -1)
-    else
+        temp=$(smartctl -A "$device" 2>/dev/null | awk '/[Tt]emp/ && NF >= 10 {print $10; exit}')
+    elif [[ "$type" == "nvme" ]]; then
         temp=$(nvme smart-log "$device" 2>/dev/null | awk '/temperature/ {print $3}' | head -1)
     fi
 
-    [[ -n "$temp" && "$temp" =~ ^[0-9]+$ ]] && echo "🌡️ ${temp}°C" || echo "🌡️ N/A"
+    if [[ "$temp" =~ ^[0-9]+$ ]]; then
+        echo "🌡️ ${temp}°C"
+    else
+        echo "🌡️ N/A"
+    fi
 }
 
 # Color output based on link speed
