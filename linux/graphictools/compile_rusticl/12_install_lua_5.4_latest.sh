@@ -42,6 +42,8 @@ install_lua_from_tarball() {
   local url="${LUA_BASE_URL}/${tarball}"
 
   log "📥 Downloading $tarball from $url"
+  [[ -z "$tarball" ]] && fail "Tarball name is empty"
+  [[ -z "$url" ]] && fail "URL is empty"
   rm -rf "$TMP_DIR"
   mkdir -p "$TMP_DIR"
   cd "$TMP_DIR"
