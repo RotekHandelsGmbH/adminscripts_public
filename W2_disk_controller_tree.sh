@@ -69,6 +69,13 @@ for disk in /sys/block/sd*; do
     serial=$(smartctl -i "$device" | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
     firmware=$(smartctl -i "$device" | grep -i 'Firmware Version' | awk -F: '{print $2}' | xargs)
     smart_health=$(smartctl -H "$device" 2>/dev/null | grep -i 'SMART overall-health' | awk -F: '{print $2}' | xargs)
+    if [[ "$smart_health" =~ ^(PASSED|OK)$ ]]; then
+        smart_health="${GREEN}✔️ $smart_health${NC}"
+    elif [[ -z "$smart_health" ]]; then
+        smart_health="unknown"
+    else
+        smart_health="${RED}⚠️ $smart_health${NC}"
+    fi
     [[ -z "$smart_health" ]] && smart_health="unknown"    protocol=$(smartctl -i "$device" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/^.*SATA Version is:[[:space:]]*//' | sed 's/(current:.*)//' | sed 's/[[:space:]]*$//')
     linkspeed=$(smartctl -i "$device" | grep -oP 'current:\s*\K[^)]+' | head -1)
     [[ -z "$linkspeed" ]] && linkspeed=$(smartctl -i "$device" | grep -oP 'SATA.*,[[:space:]]*\K[0-9.]+ Gb/s' | head -1)
@@ -113,8 +120,15 @@ for nvdev in /dev/nvme*n1; do
     serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
     firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
     smart_health=$(nvme smart-log "$nvdev" 2>/dev/null | grep -i 'overall' | awk -F: '{print $2}' | xargs)
+    if [[ "$smart_health" =~ ^0$ ]]; then
+        smart_health="${GREEN}✔️ OK${NC}"
+    elif [[ -z "$smart_health" ]]; then
+        smart_health="unknown"
+    else
+        smart_health="${RED}⚠️ $smart_health${NC}"
+    fi
     [[ -z "$smart_health" ]] && smart_health="unknown"
-    [[ "$smart_health" =~ ^0$ ]] && smart_health="OK" || smart_health="⚠️ $smart_health"    size=$(lsblk -dn -o SIZE "$nvdev")
+    [[ "$smart_health" =~ ^0$ ]] && smart_health="${GREEN}✔️ OK${NC}" || smart_health="⚠️ $smart_health"    size=$(lsblk -dn -o SIZE "$nvdev")
     [[ -z "$serial" ]] && serial="unknown"
     [[ -z "$firmware" ]] && firmware="unknown"
     [[ -z "$size" ]] && size="unknown"
