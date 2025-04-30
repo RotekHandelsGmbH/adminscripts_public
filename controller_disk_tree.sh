@@ -6,66 +6,91 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo "=============================="
-echo " Disk-to-Controller Tree (Enhanced Detection)"
+echo " Disk-to-Controller Tree (with Link Speed + Serial Numbers)"
 echo "=============================="
 echo ""
 
 declare -A CONTROLLER_DISKS
 
-# Helper: resolve deepest real storage controller, skipping bridges
 get_storage_controller() {
     local devpath="$1"
     for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | tac); do
         ctrl=$(lspci -s "$addr")
-        if echo "$ctrl" | grep -iqE 'sata|raid|sas|storage controller'; then
+        if echo "$ctrl" | grep -iqE 'sata|raid|sas|storage controller|non-volatile'; then
             echo "$ctrl"
             return
         fi
     done
-    # fallback to first match
     local first=$(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | head -1)
     echo "Unknown Controller at $first"
 }
 
+# SATA/SAS drives (sdX)
 for disk in /sys/block/sd*; do
     diskname=$(basename "$disk")
     devpath="$disk/device"
     device="/dev/$diskname"
 
-    # Get controller info (deepest actual storage controller)
     controller=$(get_storage_controller "$devpath")
-
-    # Basic info
     model=$(cat "$disk/device/model" 2>/dev/null)
     vendor=$(cat "$disk/device/vendor" 2>/dev/null)
     size=$(lsblk -dn -o SIZE "$device")
+    serial="unknown"
+    protocol=""
+    linkspeed=""
 
-    # smartctl info
     if command -v smartctl >/dev/null; then
         smartinfo=$(smartctl -i "$device" 2>/dev/null)
         protocol=$(echo "$smartinfo" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/^[ \t]*//')
         linkspeed=$(echo "$smartinfo" | grep -oP 'current:\s*\K[^)]+' | head -1)
-    else
-        protocol="(no smartctl)"
-        linkspeed=""
+        [[ -z "$linkspeed" ]] && linkspeed=$(echo "$smartinfo" | grep -oP 'SATA.*,\s*\K[0-9.]+ Gb/s' | head -1)
+        serial=$(echo "$smartinfo" | grep -i 'Serial Number' | awk -F: '{print $2}' | xargs)
     fi
 
-    # If smartctl failed to get link speed, try sysfs fallback
-    if [[ -z "$linkspeed" || "$linkspeed" == "0.0 Gb/s" ]]; then
-        # Try via /sys (only for SATA, not SAS)
+    if [[ -z "$linkspeed" ]]; then
         linkdir=$(readlink -f "$devpath" | grep -o '/ata[0-9]*/link[0-9]*')
         if [[ -n "$linkdir" && -e "/sys/class${linkdir}/sata_spd" ]]; then
             spd=$(cat "/sys/class${linkdir}/sata_spd" 2>/dev/null)
             [[ -n "$spd" ]] && linkspeed="$spd"
         fi
-        [[ -z "$linkspeed" ]] && linkspeed="unknown"
     fi
 
-    disk_info="$device  ($vendor $model, $size, $protocol, link=$linkspeed)"
+    [[ -z "$linkspeed" ]] && linkspeed="unknown"
+    [[ -z "$serial" ]] && serial="unknown"
+
+    disk_info="$device  ($vendor $model, $size, $protocol, link=$linkspeed, SN: $serial)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
-# Output grouped by controller
+# NVMe drives
+for nvdev in /dev/nvme*n1; do
+    [[ -b "$nvdev" ]] || continue
+    nvbasename=$(basename "$nvdev")
+    sysdev="/sys/block/$nvbasename/device"
+
+    controller=$(get_storage_controller "$sysdev")
+
+    model="unknown"
+    vendor="unknown"
+    link="unknown"
+    serial="unknown"
+
+    if command -v nvme >/dev/null; then
+        idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
+        model=$(echo "$idctrl" | grep -i "mn" | head -1 | awk -F: '{print $2}' | xargs)
+        vendor=$(echo "$idctrl" | grep -i "vid" | head -1 | awk -F: '{print $2}' | xargs)
+        width=$(echo "$idctrl" | grep -i "PCIe Link Width" | awk -F: '{print $2}' | xargs)
+        speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
+        serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
+        link="PCIe $speed x$width"
+    fi
+
+    size=$(lsblk -dn -o SIZE "$nvdev")
+    disk_info="$nvdev  ($vendor $model, $size, NVMe, link=$link, SN: $serial)"
+    CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
+done
+
+# Print result
 for ctrl in "${!CONTROLLER_DISKS[@]}"; do
     echo "$ctrl"
     printf "${CONTROLLER_DISKS[$ctrl]}" | while read -r line; do
