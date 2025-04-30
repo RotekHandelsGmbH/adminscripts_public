@@ -57,34 +57,6 @@ include("\${CMAKE_CURRENT_LIST_DIR}/SPIRV-ToolsTargets.cmake")
 EOF
 }
 
-patch_cmake_config_install() {
-  log "🩹 Patching SPIRV-Tools CMakeLists.txt to install CMake config..."
-  cat >> "$ROOT/CMakeLists.txt" <<'EOF'
-
-# === BEGIN: Injected config install ===
-include(CMakePackageConfigHelpers)
-set(SPIRV_TOOLS_CMAKE_CONFIG_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/SPIRV-Tools")
-
-configure_package_config_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SPIRV-ToolsConfig.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/SPIRV-ToolsConfig.cmake"
-  INSTALL_DESTINATION "${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
-)
-
-install(FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/SPIRV-ToolsConfig.cmake"
-  DESTINATION "${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
-)
-
-install(EXPORT SPIRV-ToolsTargets
-  FILE SPIRV-ToolsTargets.cmake
-  NAMESPACE SPIRV-Tools::
-  DESTINATION "${SPIRV_TOOLS_CMAKE_CONFIG_DIR}"
-)
-# === END: Injected config install ===
-EOF
-}
-
 fetch_repo() {
   if [[ ! -d "$ROOT/.git" ]]; then
     log "📥 Cloning SPIRV-Tools repository into $ROOT..."
@@ -145,6 +117,18 @@ run_profiling_workload() {
 install_final_build() {
   log "📦 Installing optimized build..."
   sudo cmake --install "$BUILD_DIR_USE" || fail "Install failed"
+
+  # Manually install only the config file (avoid exporting again)
+  local CONFIG_SRC="$BUILD_DIR_GEN/SPIRV-ToolsConfig.cmake"
+  local CONFIG_DEST="$PREFIX/lib/cmake/SPIRV-Tools"
+
+  if [[ -f "$CONFIG_SRC" ]]; then
+    log "🛠️ Manually installing SPIRV-ToolsConfig.cmake..."
+    sudo mkdir -p "$CONFIG_DEST"
+    sudo cp "$CONFIG_SRC" "$CONFIG_DEST/" || fail "Manual install of SPIRV-ToolsConfig.cmake failed"
+  else
+    warn "SPIRV-ToolsConfig.cmake not found at $CONFIG_SRC"
+  fi
 }
 
 validate_install() {
@@ -160,7 +144,6 @@ main() {
   activate_virtualenv
   fetch_repo
   create_cmake_config_template
-  patch_cmake_config_install
 
   log "🔁 First pass: -fprofile-generate"
   build_with_flags "$BUILD_DIR_GEN" "-fprofile-generate=$PROFILE_DIR" "Generate"
