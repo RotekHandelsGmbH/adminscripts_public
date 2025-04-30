@@ -78,8 +78,7 @@ get_drive_temperature() {
     if [[ "$type" == "sata" ]]; then
         temp=$(smartctl -A "$device" 2>/dev/null | awk '/[Tt]emp/ && NF >= 10 {print $10; exit}')
     elif [[ "$type" == "nvme" ]]; then
-        # Look for "temperature" field in output
-        temp=$(nvme smart-log "$device" 2>/dev/null | awk '/^temperature[^:]*:/ {gsub(/[^0-9]/,"",$2); print $2; exit}')
+        temp=$(nvme smart-log "$device" 2>/dev/null | awk -F: '/(composite )?temperature/ {gsub(/[^0-9]/,"",$2); print $2; exit}')
     fi
 
     if [[ "$temp" =~ ^[0-9]+$ ]]; then
