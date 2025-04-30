@@ -16,7 +16,7 @@ The scripts **must be executed in order** as numbered to ensure successful compi
 Tested with **AMD R9 200** and **AMD HD7970** on **Debian Bookworm**.
 
 **Important:**
-- The script `install_latest_python_clang.sh`, located one directory up in the repository structure, is also required.
+- The script `install_latest_python_gcc.sh`, located in another directory up in the repository structure, is also required.
 - Please clone the entire **adminscripts** repository using the following command:
 
   ```bash
@@ -25,59 +25,61 @@ Tested with **AMD R9 200** and **AMD HD7970** on **Debian Bookworm**.
 
 ---
 
+## Optimization Notes
+
+These scripts use **`gcc`** as the main compiler, configured with **aggressive optimization flags**:
+
+- `-O3`
+- `-march=native`
+- **Profile-guided optimizations** (2-pass compilation using `-fprofile-generate` and `-fprofile-use`)
+
+This setup aims to **squeeze maximum performance** out of older AMD GPUs by tuning the binaries specifically for the host system's architecture and usage patterns.
+
+---
+
 ## Script Descriptions and Order
 
-1. **10_create_build_env.sh**
-   - **Purpose:** Sets up the initial build environment by installing the essential development tools and dependencies required for building Mesa and related components.
+1. **10_create_build_env.sh**  
+   Sets up the initial build environment by installing essential development tools and dependencies.
 
-2. **12_install_lua_5.4_latest.sh**
-   - **Purpose:** Downloads, builds, and installs the latest Lua 5.4 version. Lua is a dependency for Mesa's build system.
+2. **12_install_lua_5.4_latest.sh**  
+   Builds and installs Lua 5.4, required by Mesa.
 
-3. **15_build_libdrm.sh**
-   - **Purpose:** Clones and builds `libdrm` (Direct Rendering Manager library) from source. This is a crucial dependency for Mesa.
+3. **15_build_libdrm.sh**  
+   Builds the Direct Rendering Manager (libdrm), a core dependency.
 
-4. **20_build_spirv_tools.sh**
-   - **Purpose:** Builds SPIRV-Tools, which are necessary for shader translation and handling in the Vulkan/OpenCL pipeline.
+4. **20_build_spirv_tools.sh**  
+   Builds SPIR-V tools for shader processing.
 
-5. **30_build_spirv_llvm_translator.sh**
-   - **Purpose:** Builds the SPIRV-LLVM-Translator, bridging between LLVM IR and SPIR-V representations.
+5. **30_build_spirv_llvm_translator.sh**  
+   Builds the SPIRV-LLVM-Translator for SPIR-V/LLVM IR conversion.
 
-6. **40_build_libclc.sh**
-   - **Purpose:** Builds `libclc`, a library providing an implementation of the OpenCL C programming language library.
+6. **40_build_libclc.sh**  
+   Builds libclc, the OpenCL C language library.
 
-7. **50_build_mesa.sh**
-   - **Purpose:** Configures, builds, and installs the Mesa 3D Graphics Library, including OpenGL, Vulkan drivers, and compute capabilities.
+7. **50_build_mesa.sh**  
+   Compiles the Mesa 3D Graphics Library with Vulkan/OpenCL support using the above optimizations.
 
-8. **60_cleanup_icds.sh**
-   - **Purpose:** Cleans up unneeded Installable Client Drivers (ICDs) to maintain a minimal environment.
+8. **60_cleanup_icds.sh**  
+   Removes unneeded Installable Client Drivers (ICDs).
 
-9. **70_write_env_profile.sh**
-   - **Purpose:** Creates a shell profile script to set environment variables permanently, making the new Mesa and associated libraries available system-wide.
+9. **70_write_env_profile.sh**  
+   Adds Mesa-related environment variables to the shell profile.
 
-10. **80_check_amd_gpu.py**
-    - **Purpose:** Python script to verify that the system is correctly configured.
-      - Checks that the **AMDGPU kernel driver** is active.
-      - Verifies **OpenCL** support (via `clinfo`) and warns if Rusticl or Clover backends are detected.
-      - Checks for **Vulkan** driver and GPU detection (via `vulkaninfo`).
-      - Gives hints if critical components are missing and suggests installing missing packages.
+10. **80_check_amd_gpu.py**  
+    Verifies driver setup and reports Vulkan/OpenCL readiness.
 
-11. **90_remove_build_env.sh**
-    - **Purpose:** Final cleanup. Removes the temporary build environment and unnecessary dependencies, leaving only the compiled Mesa drivers and essential libraries installed.
+11. **90_remove_build_env.sh**  
+    Cleans up all temporary build tools and environments.
 
-    **Important:** This script may remove packages such as:
-    - Rust toolchain (`rustc`, `cargo`)
-    - Build tools and dependencies (`cmake`, `ninja-build`, `meson`)
-    - Development headers and libraries
-    - Other development tools required only during build time
-
-    If you rely on these packages for other projects or developments, **review and adapt the cleanup script before executing** to avoid accidental removal of needed software.
+    ⚠️ **Warning:** May remove essential development tools (Rust, CMake, etc.)—review before running.
 
 ---
 
 ## Usage
 
-1. Ensure you are running on a supported Linux distribution (e.g., Ubuntu, Debian).
-2. Clone the entire adminscripts repository:
+1. Ensure you're running on a supported Linux distribution (e.g., Ubuntu, Debian).
+2. Clone the repository:
 
    ```bash
    git clone --depth 1 https://github.com/RotekHandelsGmbH/adminscripts.git
@@ -89,7 +91,7 @@ Tested with **AMD R9 200** and **AMD HD7970** on **Debian Bookworm**.
    chmod +x *.sh *.py
    ```
 
-4. Execute the scripts **in order**:
+4. Execute the scripts in order:
 
    ```bash
    ./10_create_build_env.sh
@@ -105,7 +107,7 @@ Tested with **AMD R9 200** and **AMD HD7970** on **Debian Bookworm**.
    ./90_remove_build_env.sh
    ```
 
-5. Restart your shell session or source your profile to apply environment changes:
+5. Restart your shell or source the profile:
 
    ```bash
    source ~/.profile
@@ -114,13 +116,13 @@ Tested with **AMD R9 200** and **AMD HD7970** on **Debian Bookworm**.
 ---
 
 ## Notes
-- These scripts assume **sudo** privileges are available.
-- Ensure sufficient disk space (>10GB recommended) and a stable internet connection.
-- **Clang** is used as the main compiler.
-- The latest **Python** version will be installed and used inside a **virtual environment** for building Mesa and related tools.
-- Review each script if you wish to customize paths or additional build flags.
-- Carefully check the final cleanup script if you need development tools (Rust, Meson, CMake, etc.) for other purposes.
-- The `80_check_amd_gpu.py` script provides a final verification step to ensure the AMD GPU setup, OpenCL, and Vulkan support are correctly configured.
+
+- Requires `sudo` privileges.
+- Recommend ≥10GB free disk space and stable internet connection.
+- Uses `gcc` with `-O3`, `-march=native`, and **profile-guided optimizations** to boost runtime performance.
+- Installs and uses the latest Python in a **virtual environment**.
+- Review each script to customize options as needed.
+- Final cleanup removes many build tools—review `90_remove_build_env.sh` carefully.
 
 ---
 
