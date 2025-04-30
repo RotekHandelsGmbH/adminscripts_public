@@ -112,9 +112,9 @@ for nvdev in /dev/nvme*n1; do
     vendor="0x$vendorid"
     serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
     firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
-    smart_health=$(nvme smart-log "$nvdev" 2>/dev/null | grep -i 'critical warning' | awk -F: '{print $2}' | xargs)
-    [[ -z "$smart_health" ]] && smart_health="OK"
-    [[ "$smart_health" != "0" ]] && smart_health="⚠️ $smart_health"    size=$(lsblk -dn -o SIZE "$nvdev")
+    smart_health=$(nvme smart-log "$nvdev" 2>/dev/null | grep -i 'overall' | awk -F: '{print $2}' | xargs)
+    [[ -z "$smart_health" ]] && smart_health="unknown"
+    [[ "$smart_health" =~ ^0$ ]] && smart_health="OK" || smart_health="⚠️ $smart_health"    size=$(lsblk -dn -o SIZE "$nvdev")
     [[ -z "$serial" ]] && serial="unknown"
     [[ -z "$firmware" ]] && firmware="unknown"
     [[ -z "$size" ]] && size="unknown"
