@@ -50,12 +50,12 @@ function build_with_flags() {
     -DCMAKE_CXX_FLAGS="$CXXFLAGS $extra_flags" \
     -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS"
 
-  cmake --build "$build_dir" --target spirv -- -j$(nproc) || fail "Build failed at stage: $stage_name"
+  cmake --build "$build_dir" --target llvm-spirv -- -j$(nproc) || fail "Build failed at stage: $stage_name"
 }
 
 function run_profiling_workload() {
   log "🏃 Running profiling workload..."
-  local spirv_bin="$BUILD_DIR_GEN/bin/spirv"
+  local spirv_bin="$BUILD_DIR_GEN/bin/llvm-spirv"
   [[ -x "$spirv_bin" ]] || fail "SPIR-V binary not found: $spirv_bin"
   "$spirv_bin" --version > /dev/null || fail "Profiling run failed"
 }
@@ -67,9 +67,9 @@ function install_final_build() {
 }
 
 function validate_install() {
-  local spirv_bin="$PREFIX/bin/spirv"
-  [[ -f "$spirv_bin" ]] || fail "spirv binary not found after install!"
-  debug "✅ spirv installed to: $spirv_bin"
+  local spirv_bin="$PREFIX/bin/llvm-spirv"
+  [[ -f "$spirv_bin" ]] || fail "llvm-spirv not found after install!"
+  debug "✅ llvm-spirv installed to: $spirv_bin"
 }
 
 # === MAIN BUILD SEQUENCE ===
