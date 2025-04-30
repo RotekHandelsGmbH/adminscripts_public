@@ -10,10 +10,9 @@ PROFILE_DIR="$ROOT/pgo-profile"
 BUILD_DIR_GEN="$ROOT/build-gen"
 BUILD_DIR_USE="$ROOT/build-use"
 
-PROFILE_FLAG=""
 export CFLAGS="-O3 -march=native -mtune=native -flto $PROFILE_FLAG -fomit-frame-pointer -fPIC"
 export CXXFLAGS="$CFLAGS"
-export LDFLAGS="-Wl,-O3 -flto $PROFILE_FLAG"
+export LDFLAGS="-Wl,-O3 -flto"
 
 # === Helper Functions ===
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; RESET='\033[0m'

@@ -26,9 +26,7 @@ fail()   { error "$1"; exit 1; }
 log "🛠️ Using GCC as the compiler"
 export CC=gcc
 export CXX=g++
-export CFLAGS="-O3 -march=native -mtune=native -flto $PROFILE_FLAG -fomit-frame-pointer -fPIC"
-export CXXFLAGS="$CFLAGS"
-export LDFLAGS="-Wl,-O3 -flto"
+
 
 function build_libclc_only() {
   log "Building libclc for LLVM ${LLVM_VERSION} natively..."
