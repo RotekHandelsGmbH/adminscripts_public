@@ -69,7 +69,7 @@ format_smart_health() {
     fi
 }
 
-# Get drive temperature
+# Get drive temperature (fixed, portable)
 get_drive_temperature() {
     local device="$1"
     local type="$2"
@@ -78,7 +78,7 @@ get_drive_temperature() {
     if [[ "$type" == "sata" ]]; then
         temp=$(smartctl -A "$device" 2>/dev/null | awk '/[Tt]emp/ && NF >= 10 {print $10; exit}')
     elif [[ "$type" == "nvme" ]]; then
-        temp=$(nvme smart-log "$device" 2>/dev/null | awk -F: '/^temperature[^_]/ { match($2, /([0-9]+)°C/, m); print m[1]; exit }')
+        temp=$(nvme smart-log "$device" 2>/dev/null | grep -m1 -i "^temperature" | sed -E 's/[^0-9]*([0-9]+)°C.*/\1/')
     fi
 
     if [[ "$temp" =~ ^[0-9]+$ ]]; then
