@@ -92,13 +92,19 @@ for disk in /sys/block/sd*; do
 done
 
 echo -e "${BLUE}📦 Scanning NVMe drives...${NC}"
+echo -e "${BLUE}📦 Scanning NVMe drives...${NC}"
 # NVMe drives
 for nvdev in /dev/nvme*n1; do
+    echo -e "${CYAN}🔎 Found NVMe device: $nvdev${NC}"
     [[ -b "$nvdev" ]] || continue
     sysdev="/sys/block/$(basename "$nvdev")/device"
     controller=$(get_storage_controller "$sysdev")
 
     idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
+    if [[ -z "$idctrl" ]]; then
+        echo -e "${RED}⚠️  Failed to read NVMe info from $nvdev — skipping.${NC}"
+        continue
+    fi
     model=$(echo "$idctrl" | grep -i "mn" | head -1 | awk -F: '{print $2}' | xargs)
     vendorid=$(echo "$idctrl" | grep -i "vid" | head -1 | awk -F: '{print $2}' | xargs)
     vendor="0x$vendorid"
