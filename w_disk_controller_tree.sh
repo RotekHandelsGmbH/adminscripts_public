@@ -117,8 +117,8 @@ for nvdev in /dev/nvme*n1; do
     [[ -z "$size" ]] && size="unknown"
 
     # Try sysfs first
-    width=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_width" 2>/dev/null || echo "")
-    speed=$(cat "/sys/class/nvme/$(basename "$nvdev" | sed 's/n1$//')/device/current_link_speed" 2>/dev/null || echo "")
+    width=$(cat "/sys/block/$(basename "$nvdev")/device/current_link_width" 2>/dev/null || echo "")
+    speed=$(cat "/sys/block/$(basename "$nvdev")/device/current_link_speed" 2>/dev/null || echo "")
 
     # Fallback to id-ctrl
     if [[ -z "$width" || -z "$speed" ]]; then
