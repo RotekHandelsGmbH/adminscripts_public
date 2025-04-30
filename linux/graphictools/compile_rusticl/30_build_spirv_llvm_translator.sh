@@ -82,9 +82,9 @@ function build_spirv_llvm_translator() {
 
   if [[ ! -d "spirv-llvm-translator" ]]; then
     git clone --depth=1 --branch llvm_release_180 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git || fail "Clone failed"
-  else
-    log "Using existing spirv-llvm-translator source directory"
   fi
+
+  [[ -d "spirv-llvm-translator" ]] || fail "spirv-llvm-translator directory missing after clone"
 
   # First Pass: Generate profiling data
   log "🔁 First pass: -fprofile-generate"
@@ -98,4 +98,7 @@ function build_spirv_llvm_translator() {
   validate_install
 }
 
-build_spirv_llvm_translator
+# === MAIN EXECUTION ===
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  build_spirv_llvm_translator
+fi
