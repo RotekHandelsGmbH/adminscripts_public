@@ -6,38 +6,32 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo "=============================="
-echo " Disk-to-Controller Tree (via udev)"
+echo " Disk-to-Controller Tree (via sysfs)"
 echo "=============================="
 echo ""
 
 declare -A CONTROLLER_DISKS
 
-for disk in /dev/sd?; do
-    # Skip if not a block device
-    [[ ! -b $disk ]] && continue
+for disk in /sys/block/sd*; do
+    diskname=$(basename "$disk")
+    devpath="$disk/device"
 
-    # Get PCI controller path from udevadm
-    pci_id=$(udevadm info --query=path --name=$disk | grep -oP 'pci-[^/]+')
-    [[ -z $pci_id ]] && pci_id="unknown"
+    # Follow parent chain to find PCI address
+    pciaddr=$(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | head -1)
 
-    # Map to lspci controller name if available
-    if [[ $pci_id != "unknown" ]]; then
-        # Convert "pci-0000:00:1f.2" → "00:1f.2"
-        short_id=$(echo $pci_id | sed 's/pci-//' | cut -d: -f2-)
-        controller=$(lspci -s "$short_id")
-        [[ -z $controller ]] && controller="Unknown Controller ($pci_id)"
+    if [[ -n "$pciaddr" ]]; then
+        controller=$(lspci -s "$pciaddr")
+        [[ -z "$controller" ]] && controller="Unknown Controller at $pciaddr"
     else
         controller="Unknown Controller"
     fi
 
-    # Disk details
-    name=$(basename "$disk")
-    vendor=$(cat /sys/class/block/$name/device/vendor 2>/dev/null)
-    model=$(cat /sys/class/block/$name/device/model 2>/dev/null)
-    size=$(lsblk -dn -o SIZE "$disk")
+    # Disk info
+    model=$(cat "$disk/device/model" 2>/dev/null)
+    vendor=$(cat "$disk/device/vendor" 2>/dev/null)
+    size=$(lsblk -dn -o SIZE "/dev/$diskname" 2>/dev/null)
 
-    disk_info="$disk  ($vendor $model, $size)"
-    CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
+    CONTROLLER_DISKS["$controller"]+="/dev/$diskname  ($vendor $model, $size)\n"
 done
 
 # Display results
@@ -48,9 +42,8 @@ fi
 
 for ctrl in "${!CONTROLLER_DISKS[@]}"; do
     echo "$ctrl"
-    while read -r diskline; do
-        [[ -n $diskline ]] && echo "  └── $diskline"
-    done <<< "${CONTROLLER_DISKS[$ctrl]}"
+    printf "${CONTROLLER_DISKS[$ctrl]}" | while read -r line; do
+        [[ -n "$line" ]] && echo "  └── $line"
+    done
     echo ""
 done
-
