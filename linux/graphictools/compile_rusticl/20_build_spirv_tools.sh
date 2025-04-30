@@ -13,6 +13,16 @@ PYTHON="$VENV/bin/python"
 
 EXAMPLE_SPIRV="$SCRIPT_DIR/example.spv"
 
+# === CMAKE FLAGS ===
+CMAKE_COMMON_FLAGS=(
+  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_INSTALL_PREFIX="$PREFIX"
+  -DPython3_EXECUTABLE="$PYTHON"
+  -DSPIRV_SKIP_INSTALL=OFF
+  -DSPIRV_WERROR=OFF
+  -DSPIRV_BUILD_SHARED=OFF
+)
+
 # === COLORS & LOGGING ===
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; RESET='\033[0m'
 log()    { echo -e "\n${CYAN}ℹ️  [INFO]${RESET} $1\n"; }
@@ -67,9 +77,7 @@ build_with_flags() {
   export LDFLAGS="-Wl,-O3 -flto $PROFILE_FLAG"
 
   cmake -S "$ROOT" -B "$BUILD_DIR" -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="$PREFIX" \
-    -DPython3_EXECUTABLE="$PYTHON" \
+    "${CMAKE_COMMON_FLAGS[@]}" \
     || fail "CMake configure failed"
 
   cmake --build "$BUILD_DIR" -- -j"$(nproc)" || fail "Build failed"
