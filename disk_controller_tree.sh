@@ -43,7 +43,7 @@ declare -A CONTROLLER_DISKS
 
 get_storage_controller() {
     local devpath="$1"
-    for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]' | tac); do
+    for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\\.[0-9]' | tac); do
         ctrl=$(lspci -s "$addr")
         if echo "$ctrl" | grep -iqE 'sata|raid|sas|storage controller|non-volatile'; then
             echo "$ctrl"
@@ -67,7 +67,7 @@ for disk in /sys/block/sd*; do
     firmware=$(smartctl -i "$device" | grep -i 'Firmware Version' | awk -F: '{print $2}' | xargs)
     protocol=$(smartctl -i "$device" | grep -E "Transport protocol|SATA Version" | head -1 | sed 's/^.*SATA Version is:[[:space:]]*//' | sed 's/(current:.*)//' | sed 's/[[:space:]]*$//')
     linkspeed=$(smartctl -i "$device" | grep -oP 'current:\s*\K[^)]+' | head -1)
-    [[ -z "$linkspeed" ]] && linkspeed=$(smartctl -i "$device" | grep -oP 'SATA.*,\s*\K[0-9.]+ Gb/s' | head -1)
+    [[ -z "$linkspeed" ]] && linkspeed=$(smartctl -i "$device" | grep -oP 'SATA.*,[[:space:]]*\K[0-9.]+ Gb/s' | head -1)
 
     [[ -z "$serial" ]] && serial="unknown"
     [[ -z "$firmware" ]] && firmware="unknown"
@@ -91,18 +91,26 @@ done
 # NVMe drives
 for nvdev in /dev/nvme*n1; do
     [[ -b "$nvdev" ]] || continue
-    sysdev="/sys/block/$(basename $nvdev)/device"
+    sysdev="/sys/block/$(basename "$nvdev")/device"
     controller=$(get_storage_controller "$sysdev")
 
     idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
     model=$(echo "$idctrl" | grep -i "mn" | head -1 | awk -F: '{print $2}' | xargs)
     vendorid=$(echo "$idctrl" | grep -i "vid" | head -1 | awk -F: '{print $2}' | xargs)
     vendor="0x$vendorid"
-    width=$(echo "$idctrl" | grep -i "PCIe Link Width" | awk -F: '{print $2}' | xargs)
-    speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
     serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
     firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
     size=$(lsblk -dn -o SIZE "$nvdev")
+
+    # Try sysfs first
+    width=$(cat "/sys/block/$(basename "$nvdev")/device/current_link_width" 2>/dev/null)
+    speed=$(cat "/sys/block/$(basename "$nvdev")/device/current_link_speed" 2>/dev/null)
+
+    # Fallback to id-ctrl
+    if [[ -z "$width" || -z "$speed" ]]; then
+        width=$(echo "$idctrl" | grep -i "PCIe Link Width" | awk -F: '{print $2}' | xargs)
+        speed=$(echo "$idctrl" | grep -i "PCIe Link Speed" | awk -F: '{print $2}' | xargs)
+    fi
 
     if [[ -n "$speed" && -n "$width" ]]; then
         link="PCIe $speed x$width"
