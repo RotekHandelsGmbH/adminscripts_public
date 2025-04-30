@@ -57,7 +57,11 @@ int main() {
 }
 EOF
 
-  gcc "$ROOT/test_pgo.c" -o "$ROOT/test_pgo" -I"$PREFIX/include" -L"$PREFIX/lib" -ldrm || fail "Failed to build test workload"
+  gcc "$ROOT/test_pgo.c" -o "$ROOT/test_pgo" \
+    -I"$PREFIX/include" \
+    -I"$PREFIX/include/libdrm" \
+    -L"$PREFIX/lib" -ldrm || fail "Failed to build test workload"
+
   DRM_DIR=/dev/dri
   if [[ -e "$DRM_DIR/card0" ]]; then
     "$ROOT/test_pgo" || warn "Test workload failed to run"
