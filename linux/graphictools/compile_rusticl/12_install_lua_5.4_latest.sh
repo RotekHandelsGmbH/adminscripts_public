@@ -28,13 +28,10 @@ export LDFLAGS="-Wl,-O3 -flto -fprofile-generate"
 detect_latest_54_tag() {
   log "🔍 Cloning Lua repo and detecting latest 5.4.x tag"
   rm -rf "$TMP_DIR"
-  git clone --quiet --depth=1 --filter=blob:none --tags "$LUA_REPO_URL" "$TMP_DIR/lua" || fail "Failed to clone Lua repo"
+  git clone --quiet --mirror "$LUA_REPO_URL" "$TMP_DIR/lua.git" || fail "Failed to clone Lua repo"
 
-  cd "$TMP_DIR/lua"
-  local tag
-  tag=$(git tag -l "v5.4.*" | sort -V | tail -n1)
-  [[ -n "$tag" ]] || fail "No 5.4.x tags found"
-  echo "$tag"
+  cd "$TMP_DIR"
+  git --git-dir=lua.git tag -l | grep -E "^v?5\.4(\.[0-9]+)?$" | sort -V | tee /dev/stderr | tail -n1
 }
 
 # === STEP 2: Checkout, Build and Install ===
@@ -42,6 +39,7 @@ install_lua_from_git_tag() {
   local tag="$1"
   log "📥 Checking out Lua $tag"
 
+  git clone --quiet "$TMP_DIR/lua.git" "$TMP_DIR/lua"
   cd "$TMP_DIR/lua"
   git checkout --quiet "$tag" || fail "Failed to checkout tag $tag"
 
