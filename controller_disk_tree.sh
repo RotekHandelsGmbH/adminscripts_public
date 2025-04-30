@@ -80,7 +80,7 @@ for disk in /sys/block/sd*; do
     [[ -z "$linkspeed" ]] && linkspeed="unknown"
     [[ -z "$serial" ]] && serial="unknown"
 
-    # Color the link speed
+    # Link speed color
     if [[ "$linkspeed" =~ ^(12|16|32|8)\.0 ]]; then
         linkspeed_display="${BOLD_GREEN}🧩 link=$linkspeed${NC}"
     elif [[ "$linkspeed" == "6.0 Gb/s" ]]; then
@@ -91,7 +91,7 @@ for disk in /sys/block/sd*; do
         linkspeed_display="🧩 link=$linkspeed"
     fi
 
-    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, ${YELLOW}🔢 SN: $serial${NC})"
+    disk_info="${GREEN}💾 $device${NC}  ($vendor $model, $size, $protocol, $linkspeed_display, 🔢 SN: $serial)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
@@ -117,7 +117,6 @@ for nvdev in /dev/nvme*n1; do
     link="PCIe $speed x$width"
     size=$(lsblk -dn -o SIZE "$nvdev")
 
-    # Color the NVMe link
     if [[ "$link" =~ (16\.0|32\.0|8\.0|12\.0) ]]; then
         link_display="${BOLD_GREEN}🧩 link=$link${NC}"
     elif [[ "$link" =~ 6\.0 ]]; then
@@ -128,7 +127,7 @@ for nvdev in /dev/nvme*n1; do
         link_display="🧩 link=$link"
     fi
 
-    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, ${YELLOW}🔢 SN: $serial${NC})"
+    disk_info="${GREEN}💾 $nvdev${NC}  ($vendor $model, $size, NVMe, $link_display, 🔢 SN: $serial)"
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
