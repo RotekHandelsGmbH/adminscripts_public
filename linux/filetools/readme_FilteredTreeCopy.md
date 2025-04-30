@@ -1,12 +1,12 @@
-# FilteredTreeSync.sh
+# FilteredTreeCopy.sh
 
-**Selective Tree-Based File Synchronization Script**
+**Selective Tree-Based File Copy or Move Script**
 
 ---
 
 ## 🌳 Overview
 
-**FilteredTreeSync.sh** is a professional Bash script that:
+**FilteredTreeCopy.sh** is a professional Bash script that:
 
 - Selectively **copies** files matching a specific pattern
 - **Preserves** the full **directory tree** structure
@@ -40,7 +40,7 @@
 No installation required. Simply download the script and make it executable:
 
 ```bash
-chmod +x FilteredTreeSync.sh
+chmod +x FilteredTreeCopy.sh
 ```
 
 Place it somewhere in your `PATH` if you want global access, e.g., `/usr/local/bin`.
@@ -50,7 +50,7 @@ Place it somewhere in your `PATH` if you want global access, e.g., `/usr/local/b
 ## 📚 Usage
 
 ```bash
-./FilteredTreeSync.sh <source_directory> <destination_directory> <file_pattern> [--deletesources] [--dry-run] [--autoconfirm]
+./FilteredTreeCopy.sh <source_directory> <destination_directory> <file_pattern> [--deletesources] [--dry-run] [--autoconfirm]
 ```
 
 ### Parameters:
@@ -67,31 +67,31 @@ Place it somewhere in your `PATH` if you want global access, e.g., `/usr/local/b
 **Simple copy with structure preservation:**
 
 ```bash
-./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf"
+./FilteredTreeCopy.sh /home/user/docs /backup/docs "*.pdf"
 ```
 
 **Copy and delete source files after successful verification:**
 
 ```bash
-./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --deletesources
+./FilteredTreeCopy.sh /home/user/docs /backup/docs "*.pdf" --deletesources
 ```
 
 **Dry-run (simulate operations only):**
 
 ```bash
-./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --dry-run
+./FilteredTreeCopy.sh /home/user/docs /backup/docs "*.pdf" --dry-run
 ```
 
 **Dry-run with auto-confirm:**
 
 ```bash
-./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --dry-run --autoconfirm
+./FilteredTreeCopy.sh /home/user/docs /backup/docs "*.pdf" --dry-run --autoconfirm
 ```
 
 **Dry-run with delete simulation and auto-confirm:**
 
 ```bash
-./FilteredTreeSync.sh /home/user/docs /backup/docs "*.pdf" --deletesources --dry-run --autoconfirm
+./FilteredTreeCopy.sh /home/user/docs /backup/docs "*.pdf" --deletesources --dry-run --autoconfirm
 ```
 
 ---
@@ -108,7 +108,7 @@ Place it somewhere in your `PATH` if you want global access, e.g., `/usr/local/b
 ## 🎨 Example Output
 
 ```bash
-    🌳  FilteredTreeSync
+    🌳  FilteredTreeCopy
       /\
      /  \    Filter + Copy + Preserve Directory Structure
     /____\
@@ -162,5 +162,5 @@ Feel free to suggest improvements or submit pull requests!
 
 ---
 
-Enjoy using **FilteredTreeSync.sh** and keep your file trees synchronized safely and smartly! 🌳
+Enjoy using **FilteredTreeCopy.sh** and keep your file trees synchronized safely and smartly! 🌳
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-#  FilteredTreeSync.sh
+#  FilteredTreeCopy.sh
 #
 #  🌳 Selective Tree-Based File Synchronization Script
 #
@@ -31,7 +31,7 @@ DELETE="🗑️"
 
 # Logo
 echo -e "${GREEN}"
-echo "    🌳  FilteredTreeSync"
+echo "    🌳  FilteredTreeCopy"
 echo "      /\\"
 echo "     /  \\    Filter + Copy + Preserve Directory Structure"
 echo "    /____\\"
