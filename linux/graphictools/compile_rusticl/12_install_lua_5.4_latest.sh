@@ -73,5 +73,5 @@ install_lua_from_git_tag() {
 
 # === MAIN ===
 log "🚀 Starting Lua 5.4.x install from Git tags..."
-tag=$(detect_latest_54_tag)
+tag=$(detect_latest_54_tag | tail -n1 | tr -d '[:space:]')
 install_lua_from_git_tag "$tag"
