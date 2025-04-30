@@ -92,13 +92,14 @@ for disk in /sys/block/sd*; do
 done
 
 echo -e "${BLUE}📦 Scanning NVMe drives...${NC}"
-echo -e "${BLUE}📦 Scanning NVMe drives...${NC}"
 # NVMe drives
 for nvdev in /dev/nvme*n1; do
+    echo -e "${CYAN}🔎 Found NVMe device: $nvdev${NC}"
     echo -e "${CYAN}🔎 Found NVMe device: $nvdev${NC}"
     [[ -b "$nvdev" ]] || continue
     sysdev="/sys/block/$(basename "$nvdev")/device"
     controller=$(get_storage_controller "$sysdev")
+    echo -e "${CYAN}📌 Controller: $controller${NC}"
 
     idctrl=$(nvme id-ctrl -H "$nvdev" 2>/dev/null)
     if [[ -z "$idctrl" ]]; then
@@ -111,10 +112,13 @@ for nvdev in /dev/nvme*n1; do
     serial=$(echo "$idctrl" | grep -i "sn" | head -1 | awk -F: '{print $2}' | xargs)
     firmware=$(echo "$idctrl" | grep -i "fr" | head -1 | awk -F: '{print $2}' | xargs)
     size=$(lsblk -dn -o SIZE "$nvdev")
+    [[ -z "$serial" ]] && serial="unknown"
+    [[ -z "$firmware" ]] && firmware="unknown"
+    [[ -z "$size" ]] && size="unknown"
 
     # Try sysfs first
-    width=$(cat "/sys/block/$(basename "$nvdev")/device/current_link_width" 2>/dev/null)
-    speed=$(cat "/sys/block/$(basename "$nvdev")/device/current_link_speed" 2>/dev/null)
+    width=$(cat "/sys/block/$(basename "$nvdev")/device/current_link_width" 2>/dev/null || echo "")
+    speed=$(cat "/sys/block/$(basename "$nvdev")/device/current_link_speed" 2>/dev/null || echo "")
 
     # Fallback to id-ctrl
     if [[ -z "$width" || -z "$speed" ]]; then
