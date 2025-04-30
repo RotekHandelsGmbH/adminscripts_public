@@ -26,7 +26,7 @@ export LDFLAGS="-Wl,-O3 -flto -fprofile-generate"
 
 # === STEP 1: Detect Latest Lua 5.4.x Tarball ===
 detect_latest_tarball() {
-  log "🔍 Detecting latest Lua 5.4.x tarball from $LUA_BASE_URL"
+  log "🔍 Detecting latest Lua 5.4.x tarball from $LUA_BASE_URL" >&2
   local listing candidates latest
   listing=$(curl -fs "$LUA_BASE_URL/") || fail "Failed to fetch tarball listing"
   candidates=$(echo "$listing" | grep -Eo 'lua-5\.4\.[0-9]+\.tar\.gz' | sort -V | uniq)
