@@ -127,8 +127,13 @@ for nvdev in /dev/nvme*n1; do
     else
         smart_health="${RED}⚠️ $smart_health${NC}"
     fi
-    [[ -z "$smart_health" ]] && smart_health="unknown"
-    [[ "$smart_health" =~ ^0$ ]] && smart_health="${GREEN}✔️ OK${NC}" || smart_health="⚠️ $smart_health"    size=$(lsblk -dn -o SIZE "$nvdev")
+    if [[ "$smart_health" =~ ^0$ ]]; then
+        smart_health="${GREEN}✔️ OK${NC}"
+    elif [[ -z "$smart_health" ]]; then
+        smart_health="unknown"
+    else
+        smart_health="${RED}⚠️ $smart_health${NC}"
+    fi    size=$(lsblk -dn -o SIZE "$nvdev")
     [[ -z "$serial" ]] && serial="unknown"
     [[ -z "$firmware" ]] && firmware="unknown"
     [[ -z "$size" ]] && size="unknown"
