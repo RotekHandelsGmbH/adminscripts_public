@@ -41,6 +41,8 @@ fi
 
 declare -A CONTROLLER_DISKS
 
+echo -e "${BLUE}🔍 Scanning for disks...${NC}"
+
 get_storage_controller() {
     local devpath="$1"
     for addr in $(realpath "$devpath" | grep -oP '([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\\.[0-9]' | tac); do
@@ -53,6 +55,7 @@ get_storage_controller() {
     echo "Unknown Controller"
 }
 
+echo -e "${BLUE}📦 Scanning SATA/SAS drives...${NC}"
 # SATA/SAS drives
 for disk in /sys/block/sd*; do
     diskname=$(basename "$disk")
@@ -88,6 +91,7 @@ for disk in /sys/block/sd*; do
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
+echo -e "${BLUE}📦 Scanning NVMe drives...${NC}"
 # NVMe drives
 for nvdev in /dev/nvme*n1; do
     [[ -b "$nvdev" ]] || continue
@@ -132,6 +136,7 @@ for nvdev in /dev/nvme*n1; do
     CONTROLLER_DISKS["$controller"]+="$disk_info"$'\n'
 done
 
+echo -e "${BLUE}📤 Preparing output...${NC}"
 # Output
 echo -e "${CYAN}=============================="
 echo -e " Disk-to-Controller Tree (SATA/SAS/NVMe + Serial + Link Speed)"
