@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -x  # Debug trace
 
 # === CONFIGURATION ===
 LLVM_VERSION="18"
@@ -17,10 +18,7 @@ export CXXFLAGS="$CFLAGS"
 export LDFLAGS="-Wl,-O3 -flto $PROFILE_FLAG"
 
 # === Helper Functions (Colorful, Emoji, One-liners) ===
-
-# Color codes
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; RESET='\033[0m'
-
 log()    { echo -e "\n${CYAN}ℹ️  [INFO]${RESET} $1\n"; }
 debug()  { echo -e "${BLUE}🐞 [DEBUG]${RESET} $1"; }
 warn()   { echo -e "${YELLOW}⚠️ [WARN]${RESET} $1"; }
@@ -48,17 +46,18 @@ function build_with_flags() {
     -DLLVM_CONFIG="$LLVM_CONFIG" \
     -DCMAKE_PREFIX_PATH="$($LLVM_CONFIG --prefix);$PREFIX" \
     -DLLVM_DIR="$($LLVM_CONFIG --prefix)/lib/cmake/llvm" \
-    -DENABLE_LLVM_SPIRV=ON \
     -DCMAKE_C_FLAGS="$CFLAGS $extra_flags" \
     -DCMAKE_CXX_FLAGS="$CXXFLAGS $extra_flags" \
     -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS"
 
-  cmake --build "$build_dir" --target llvm-spirv -- -j$(nproc)
+  cmake --build "$build_dir" --target spirv -- -j$(nproc) || fail "Build failed at stage: $stage_name"
 }
 
 function run_profiling_workload() {
   log "🏃 Running profiling workload..."
-  "$BUILD_DIR_GEN/bin/llvm-spirv" --version > /dev/null || fail "Profiling run failed"
+  local spirv_bin="$BUILD_DIR_GEN/bin/spirv"
+  [[ -x "$spirv_bin" ]] || fail "SPIR-V binary not found: $spirv_bin"
+  "$spirv_bin" --version > /dev/null || fail "Profiling run failed"
 }
 
 function install_final_build() {
@@ -68,10 +67,9 @@ function install_final_build() {
 }
 
 function validate_install() {
-  if [[ ! -f "$PREFIX/bin/llvm-spirv" ]]; then
-    fail "llvm-spirv not found after install!"
-  fi
-  debug "✅ llvm-spirv installed to: $PREFIX/bin/llvm-spirv"
+  local spirv_bin="$PREFIX/bin/spirv"
+  [[ -f "$spirv_bin" ]] || fail "spirv binary not found after install!"
+  debug "✅ spirv installed to: $spirv_bin"
 }
 
 # === MAIN BUILD SEQUENCE ===
@@ -84,7 +82,6 @@ function build_spirv_llvm_translator() {
 
   log "📥 Cloning fresh SPIRV-LLVM-Translator repository..."
   git clone --depth=1 --branch llvm_release_180 https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git spirv-llvm-translator || fail "Clone failed"
-
   [[ -d "spirv-llvm-translator" ]] || fail "spirv-llvm-translator directory missing after clone"
 
   # First Pass: Generate profiling data
