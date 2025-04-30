@@ -51,6 +51,7 @@ print_output() {
 # ── Dependency Handling ───────────────────────────────────────────────────────────────
 
 check_dependencies() {
+    echo -e "${BLUE}🔍 Checking dependencies...${NC}"
     local REQUIRED_PKGS=(smartmontools nvme-cli)
     local MISSING=()
 
@@ -121,6 +122,7 @@ color_link_speed() {
 # ── Disk Processing ───────────────────────────────────────────────────────────────────
 
 process_sata_disks() {
+    echo -e "${BLUE}🧮 Scanning SATA disks...${NC}"
     for disk in /sys/block/sd*; do
         local device="/dev/$(basename "$disk")"
         local devpath="$disk/device"
@@ -145,6 +147,7 @@ process_sata_disks() {
 }
 
 process_nvme_disks() {
+    echo -e "${BLUE}⚡ Scanning NVMe disks...${NC}"
     for nvdev in /dev/nvme*n1; do
         [[ -b "$nvdev" ]] || continue
         local sysdev="/sys/block/$(basename "$nvdev")/device"
