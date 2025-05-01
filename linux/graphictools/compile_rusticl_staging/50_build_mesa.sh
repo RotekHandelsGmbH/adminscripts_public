@@ -16,7 +16,6 @@ LOCAL_LUA="/opt/lua-5.4"
 export LLVM_CONFIG="llvm-config-${LLVM_VERSION}"
 export PATH="/usr/lib/llvm-${LLVM_VERSION}/bin:$PATH"
 
-
 # === Helper Functions (Colorful, Emoji, One-liners) ===
 
 # Color codes
@@ -29,22 +28,10 @@ success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
 fail()   { error "$1"; exit 1; }
 
-# === Force Clang ===
-# log "🛠️ Forcing Clang as the compiler"
-# export CC=clang
-# export CXX=clang++
-
+# === Cleanup ===
 log "🛠️ Cleaning up old build directory"
 rm -rf "$BUILD_DIR"
 rm -rf "$ROOT/mesa"
-
-# === Force GCC ===
-# log "🛠️ Forcing GCC as the compiler and setup compiler flags"
-# export CC=gcc
-# export CXX=g++
-# export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
-# export CXXFLAGS="$CFLAGS"
-# export LDFLAGS="-Wl,-O3 -flto"
 
 # === Force GCC ===
 log "🛠️ Forcing GCC as the compiler and setup compiler flags"
@@ -68,8 +55,6 @@ export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all"
 # -Wl,--strip-all        # Strip all symbol information from the final binary (smaller size, but no debugging symbols)
 # -shared                # Produce a shared object (.so) instead of an executable
 # -fprofile-generate    # Instrument the program to collect profiling data at runtime (for use with PGO - Profile Guided Optimization)
-
-
 
 # === Activate Python venv & Rust ===
 function activate_env() {

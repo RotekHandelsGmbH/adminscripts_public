@@ -28,14 +28,6 @@ log "🛠️ Cleaning up old build directory"
 rm -rf "${ROOT}"
 
 # === Force GCC ===
-log "🛠️ OLD Forcing GCC as the compiler and setup compiler flags"
-export CC=gcc
-export CXX=g++
-export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
-export CXXFLAGS="$CFLAGS"
-export LDFLAGS="-Wl,-O3 -flto"
-
-# === Force GCC ===
 log "🛠️ Forcing GCC as the compiler and setup compiler flags"
 # export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG -fprofile-generate"
 export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG"
@@ -57,7 +49,6 @@ export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all"
 # -Wl,--strip-all        # Strip all symbol information from the final binary (smaller size, but no debugging symbols)
 # -shared                # Produce a shared object (.so) instead of an executable
 # -fprofile-generate    # Instrument the program to collect profiling data at runtime (for use with PGO - Profile Guided Optimization)
-
 
 # === BUILD ===
 function build_spirv_llvm_translator() {
