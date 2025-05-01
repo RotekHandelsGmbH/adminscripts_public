@@ -22,10 +22,17 @@ success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
 fail()   { error "$1"; exit 1; }
 
-# === Force Clang ===
-log "🛠️ Forcing Clang as the compiler"
-export CC=clang
-export CXX=clang++
+
+log "🛠️ Cleaning up old build directory"
+rm -rf "${ROOT}"
+
+# === Force GCC ===
+log "🛠️ Forcing GCC as the compiler and setup compiler flags"
+export CC=gcc
+export CXX=g++
+export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
+export CXXFLAGS="$CFLAGS"
+export LDFLAGS="-Wl,-O3 -flto"
 
 function build_libclc_only() {
   log "Building libclc for LLVM ${LLVM_VERSION} natively..."
