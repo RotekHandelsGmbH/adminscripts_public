@@ -15,6 +15,9 @@ success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
 fail()   { error "$1"; exit 1; }
 
+log "🛠️ Cleaning up old build directory"
+rm -rf "${ROOT}/drm"
+
 # === Force GCC ===
 log "🛠️ Forcing GCC as the compiler"
 export CC=gcc
@@ -33,9 +36,25 @@ function build_libdrm() {
 
   # === First pass: generate profiling data ===
   log "🔁 First pass: compiling with -fprofile-generate"
-  export CFLAGS="-O3 -march=native -mtune=native -flto -fprofile-generate -fomit-frame-pointer -fPIC"
+  export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG -fprofile-generate"
   export CXXFLAGS="$CFLAGS"
-  export LDFLAGS="-Wl,-O3 -flto -fprofile-generate"
+  # -O3                   # Enable highest level of optimization (aggressive inlining, loop unrolling, vectorization)
+  # -march=native         # Optimize code for the local CPU architecture (may break portability)
+  # -flto                 # Enable Link Time Optimization (LTO) for better cross-module optimization
+  # -fPIC                 # Generate position-independent code (required for shared libraries)
+  # -fvisibility=hidden   # Hide all symbols by default; only explicitly exported ones are visible (improves load time and security)
+  # -fomit-frame-pointer  # Omit the frame pointer to free a register (slightly faster, but makes debugging stack traces harder)
+  # -DNDEBUG              # Disable debug `assert()` and other debug-only code (used in production builds)
+  # -fprofile-generate    # Instrument the program to collect profiling data at runtime (for use with PGO - Profile Guided Optimization)
+
+  # export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -shared  -fprofile-generate"
+  export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -fprofile-generate"
+  # -flto                  # Enable Link Time Optimization (LTO) during linking for cross-module inlining and better optimization
+  # -Wl,-O1                # Pass optimization level 1 to the linker (balance between speed and link-time complexity)
+  # -Wl,--as-needed        # Only link shared libraries that are actually used (reduces dependencies and load time)
+  # -Wl,--strip-all        # Strip all symbol information from the final binary (smaller size, but no debugging symbols)
+  # -shared                # Produce a shared object (.so) instead of an executable
+  # -fprofile-generate    # Instrument the program to collect profiling data at runtime (for use with PGO - Profile Guided Optimization)
 
   rm -rf "$ROOT/drm/build"
   meson setup "$ROOT/drm/build" "$ROOT/drm" \
@@ -76,6 +95,26 @@ EOF
   export CFLAGS="-O3 -march=native -mtune=native -flto -fprofile-use -fomit-frame-pointer -fPIC"
   export CXXFLAGS="$CFLAGS"
   export LDFLAGS="-Wl,-O3 -flto -fprofile-use"
+
+  export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG -fprofile-use"
+  export CXXFLAGS="$CFLAGS"
+  # -O3                   # Enable highest level of optimization (aggressive inlining, loop unrolling, vectorization)
+  # -march=native         # Optimize code for the local CPU architecture (may break portability)
+  # -flto                 # Enable Link Time Optimization (LTO) for better cross-module optimization
+  # -fPIC                 # Generate position-independent code (required for shared libraries)
+  # -fvisibility=hidden   # Hide all symbols by default; only explicitly exported ones are visible (improves load time and security)
+  # -fomit-frame-pointer  # Omit the frame pointer to free a register (slightly faster, but makes debugging stack traces harder)
+  # -DNDEBUG              # Disable debug `assert()` and other debug-only code (used in production builds)
+  # -fprofile-use        # Use collected profiling data (from -fprofile-generate) to optimize code layout, inlining, and branch prediction
+
+  # export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -shared -fprofile-use"
+  export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -fprofile-use"
+  # -flto                  # Enable Link Time Optimization (LTO) during linking for cross-module inlining and better optimization
+  # -Wl,-O1                # Pass optimization level 1 to the linker (balance between speed and link-time complexity)
+  # -Wl,--as-needed        # Only link shared libraries that are actually used (reduces dependencies and load time)
+  # -Wl,--strip-all        # Strip all symbol information from the final binary (smaller size, but no debugging symbols)
+  # -shared                # Produce a shared object (.so) instead of an executable
+  # -fprofile-use        # Use collected profiling data (from -fprofile-generate) to optimize code layout, inlining, and branch prediction
 
   rm -rf "$ROOT/drm/build"
   meson setup "$ROOT/drm/build" "$ROOT/drm" \

@@ -10,8 +10,9 @@ log()    { echo -e "\n${CYAN}ℹ️  [INFO]${RESET} $1\n"; }
 debug()  { echo -e "${BLUE}🐞 [DEBUG]${RESET} $1"; }
 warn()   { echo -e "${YELLOW}⚠️ [WARN]${RESET} $1"; }
 success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
-error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
+error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
 fail()   { error "$1"; exit 1; }
+
 
 # === CONFIGURATION ===
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,16 +35,8 @@ function setup_system_dependencies() {
   log "🔧 Installing system dependencies via APT..."
   sudo apt update
 
-  if ! command -v gcc &>/dev/null; then
-    warn "GCC not found. Installing essential build tools..."
-    log "🛠️  Installing build-essential (includes gcc, g++, make)..."
-    sudo apt install -y build-essential
-  else
-    debug "GCC is present: $(gcc --version | head -n1)"
-  fi
-
   local pkgs=(
-    bison cmake flex git
+    bison build-essential clang-${LLVM_VERSION} cmake flex git
     glslang-dev glslang-tools libclang-cpp${LLVM_VERSION}-dev libdrm-dev libelf-dev
     libexpat1-dev libglvnd-dev libpolly-${LLVM_VERSION}-dev libudev-dev
     libunwind-dev libva-dev libwayland-dev libegl1-mesa-dev
@@ -53,6 +46,7 @@ function setup_system_dependencies() {
     libxcb-sync-dev libxcb1-dev libxshmfence-dev libxxf86vm-dev
     meson ninja-build pkg-config python3-pip python3-setuptools
     valgrind wayland-protocols zlib1g-dev libzstd-dev curl
+    libcurl4-openssl-dev
   )
 
   debug "Installing required packages..."
@@ -63,6 +57,7 @@ function setup_system_dependencies() {
     log "✅ lua5.4-dev installed"
   else
     warn "lua5.4-dev not available – will use compiled Lua script"
+    # call fallback installer
     "$ROOT/12_install_lua_5.4_latest.sh"
   fi
 }
@@ -83,7 +78,7 @@ function install_llvm_from_repo() {
   fi
 
   sudo apt update
-  sudo apt install -y llvm-${LLVM_VERSION}-dev
+  sudo apt install -y llvm-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
 
   debug "Checking llvm-config binary..."
   check_command "$LLVM_CONFIG"
@@ -105,6 +100,7 @@ function install_python_latest() {
     fail "Python install script not found or not executable: $script_path"
   fi
 }
+
 
 # === PYTHON VIRTUAL ENVIRONMENT ===
 function setup_virtualenv() {
@@ -153,10 +149,79 @@ function clean_build_dirs() {
   mkdir -p "$ROOT"
 }
 
+
+# === INSTALL CLANG ===
+function install_clang() {
+  log "🔍 Checking for existing Clang installation..."
+  if command -v clang >/dev/null 2>&1; then
+    success "Clang is already installed: $(clang --version | head -n1)"
+    return 0
+  fi
+
+  log "⚙️ Installing Clang..."
+
+  # Detect distro
+  if [[ -r /etc/os-release ]]; then
+    . /etc/os-release
+    distro=$ID
+    distro_like=${ID_LIKE:-}
+  else
+    fail "Cannot detect Linux distribution (missing /etc/os-release)"
+  fi
+
+  case "$distro" in
+    ubuntu|debian)
+      sudo apt-get update
+      sudo apt-get install -y clang
+      ;;
+    fedora)
+      sudo dnf install -y clang
+      ;;
+    centos|rhel)
+      sudo yum install -y epel-release   # enable EPEL if needed
+      sudo yum install -y clang
+      ;;
+    arch)
+      sudo pacman -Sy --noconfirm clang
+      ;;
+    *)
+      # try generic families
+      case "$distro_like" in
+        debian)
+          sudo apt-get update
+          sudo apt-get install -y clang
+          ;;
+        rhel|fedora)
+          if command -v dnf >/dev/null; then
+            sudo dnf install -y clang
+          else
+            sudo yum install -y clang
+          fi
+          ;;
+        arch)
+          sudo pacman -Sy --noconfirm clang
+          ;;
+        *)
+          fail "Unsupported distro: $distro. Please install clang manually."
+          ;;
+      esac
+      ;;
+  esac
+
+  # verify
+  if command -v clang >/dev/null 2>&1; then
+    success "Clang installed successfully: $(clang --version | head -n1)"
+  else
+    fail "Clang installation failed"
+  fi
+}
+
+
 # === MAIN ===
 log "🚀 Starting environment setup for Mesa + Rusticl builds..."
 
 setup_system_dependencies
+install_clang
 install_llvm_from_repo
 install_python_latest
 setup_virtualenv
