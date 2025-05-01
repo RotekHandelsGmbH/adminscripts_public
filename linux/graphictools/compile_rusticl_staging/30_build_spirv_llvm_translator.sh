@@ -24,6 +24,9 @@ fail()   { error "$1"; exit 1; }
 #export CC=clang
 #export CXX=clang++
 
+log "🛠️ Cleaning up old build directory"
+rm -rf "${ROOT}"
+
 # === Force GCC ===
 log "🛠️ Forcing GCC as the compiler and setup compiler flags"
 export CC=gcc

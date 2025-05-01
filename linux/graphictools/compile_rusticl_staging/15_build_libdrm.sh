@@ -15,6 +15,9 @@ success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
 fail()   { error "$1"; exit 1; }
 
+log "🛠️ Cleaning up old build directory"
+rm -rf "${ROOT}/drm"
+
 # === Force GCC ===
 log "🛠️ Forcing GCC as the compiler"
 export CC=gcc
