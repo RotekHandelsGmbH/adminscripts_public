@@ -37,6 +37,7 @@ function build_libdrm() {
   # === First pass: generate profiling data ===
   log "🔁 First pass: compiling with -fprofile-generate"
   export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG -fprofile-generate"
+  export CXXFLAGS="$CFLAGS"
   # -O3                   # Enable highest level of optimization (aggressive inlining, loop unrolling, vectorization)
   # -march=native         # Optimize code for the local CPU architecture (may break portability)
   # -flto                 # Enable Link Time Optimization (LTO) for better cross-module optimization
@@ -46,7 +47,6 @@ function build_libdrm() {
   # -DNDEBUG              # Disable debug `assert()` and other debug-only code (used in production builds)
   # -fprofile-generate    # Instrument the program to collect profiling data at runtime (for use with PGO - Profile Guided Optimization)
 
-  export CXXFLAGS="$CFLAGS"
   # export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -shared  -fprofile-generate"
   export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -fprofile-generate"
   # -flto                  # Enable Link Time Optimization (LTO) during linking for cross-module inlining and better optimization
@@ -97,6 +97,7 @@ EOF
   export LDFLAGS="-Wl,-O3 -flto -fprofile-use"
 
   export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG -fprofile-use"
+  export CXXFLAGS="$CFLAGS"
   # -O3                   # Enable highest level of optimization (aggressive inlining, loop unrolling, vectorization)
   # -march=native         # Optimize code for the local CPU architecture (may break portability)
   # -flto                 # Enable Link Time Optimization (LTO) for better cross-module optimization
@@ -106,7 +107,6 @@ EOF
   # -DNDEBUG              # Disable debug `assert()` and other debug-only code (used in production builds)
   # -fprofile-use        # Use collected profiling data (from -fprofile-generate) to optimize code layout, inlining, and branch prediction
 
-  export CXXFLAGS="$CFLAGS"
   # export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -shared -fprofile-use"
   export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -fprofile-use"
   # -flto                  # Enable Link Time Optimization (LTO) during linking for cross-module inlining and better optimization
