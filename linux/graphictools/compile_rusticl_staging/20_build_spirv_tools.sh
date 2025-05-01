@@ -22,16 +22,12 @@ error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
 fail()   { error "$1"; exit 1; }
 
 # === Force GCC ===
-log "🛠️ Forcing GCC as the compiler"
+log "🛠️ Forcing GCC as the compiler and setup compiler flags"
 export CC=gcc
 export CXX=g++
-
-  # === First pass: generate profiling data ===
-  log "🔁 First pass: compiling with -fprofile-generate"
-  export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
-  export CXXFLAGS="$CFLAGS"
-  export LDFLAGS="-Wl,-O3 -flto"
-
+export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
+export CXXFLAGS="$CFLAGS"
+export LDFLAGS="-Wl,-O3 -flto"
 
 function activate_virtualenv() {
   log "🔧 Activating Python virtual environment from: $VENV"
