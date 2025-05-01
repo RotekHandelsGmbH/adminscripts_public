@@ -89,12 +89,22 @@ function run_profiling_load() {
   done
 
   if command -v glslangValidator &>/dev/null; then
-    find "$SPIRV_CORPUS" -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \) | while read -r shader; do
-      if glslangValidator -V "$shader" -o /dev/null 2>>"$log_file"; then
-        log "✓ GLSL compiled: $shader"
+    find "$SPIRV_CORPUS" -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \) \
+      ! -name "*.asm.*" ! -name "*.spvasm" ! -name "*.nonuniformresource.*" | while read -r shader; do
+
+      log "🔍 Checking shader: $shader"
+
+      if grep -q "#version" "$shader" && grep -q "void main" "$shader"; then
+        if glslangValidator -V "$shader" -o /dev/null 2>>"$log_file"; then
+          log "✓ GLSL compiled: $shader"
+        else
+          warn "✗ GLSL compile failed: $shader"
+          echo "GLSL compile failed: $shader" >> "$log_file"
+        fi
       else
-        warn "✗ GLSL compile failed: $shader"
+        warn "⚠️ Skipping invalid shader (missing #version or main): $shader"
       fi
+
     done
   else
     warn "glslangValidator not found; skipping GLSL compilation"
