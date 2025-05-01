@@ -54,11 +54,14 @@ function build_spirv_tools_pgo() {
   if [[ "$mode" == "generate" ]]; then
     extra_flags="-fprofile-generate=$PROFILE_DIR"
   elif [[ "$mode" == "use" ]]; then
-    extra_flags="-fprofile-use=$PROFILE_DIR -fprofile-correction"
+    extra_flags="-fprofile-use=$PROFILE_DIR -fprofile-correction -Wno-error=missing-profile"
   fi
 
   export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG $extra_flags"
   export CXXFLAGS="$CFLAGS"
+  if [[ "$mode" == "use" ]]; then
+    export CXXFLAGS="${CXXFLAGS/-Werror/} -Wno-error=missing-profile"
+  fi
   export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -shared $extra_flags"
 
   rm -rf "$BUILD_DIR-$build_suffix"
