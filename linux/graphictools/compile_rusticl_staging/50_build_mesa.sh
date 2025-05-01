@@ -17,10 +17,6 @@ export LLVM_CONFIG="llvm-config-${LLVM_VERSION}"
 export PATH="/usr/lib/llvm-${LLVM_VERSION}/bin:$PATH"
 
 
-rm -rf "$BUILD_DIR"
-rm -rf "$ROOT/mesa"
-
-
 # === Helper Functions (Colorful, Emoji, One-liners) ===
 
 # Color codes
@@ -34,13 +30,22 @@ error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; } # will continue
 fail()   { error "$1"; exit 1; }
 
 # === Force Clang ===
-log "🛠️ Forcing Clang as the compiler"
-export CC=clang
-export CXX=clang++
+# log "🛠️ Forcing Clang as the compiler"
+# export CC=clang
+# export CXX=clang++
 
-# === Force gcc ===
-# export CC=gcc
-# export CXX=g++
+log "🛠️ Cleaning up old build directory"
+rm -rf "$BUILD_DIR"
+rm -rf "$ROOT/mesa"
+
+# === Force GCC ===
+log "🛠️ Forcing GCC as the compiler and setup compiler flags"
+export CC=gcc
+export CXX=g++
+export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
+export CXXFLAGS="$CFLAGS"
+export LDFLAGS="-Wl,-O3 -flto"
+
 
 # === Activate Python venv & Rust ===
 function activate_env() {

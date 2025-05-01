@@ -73,11 +73,8 @@ find_package(SPIRV-Tools REQUIRED CONFIG)\nset(SPIRV-Tools_INCLUDE_DIR "'"$PREFI
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_CONFIG="$LLVM_CONFIG" \
-    -DENABLE_SPIRV=ON \
     -DCMAKE_PREFIX_PATH="$PREFIX;$PREFIX/lib;$PREFIX/lib/cmake" \
     -DCMAKE_MODULE_PATH="$PREFIX/lib/cmake/SPIRV-Tools" \
-    -DSPIRV_TOOLS_INCLUDE_DIR="$PREFIX/include" \
-    -DSPIRV_TOOLS_LIBRARY="$PREFIX/lib/libSPIRV-Tools.a" \
     -DSPIRV-Tools_DIR="$PREFIX/lib/cmake/SPIRV-Tools" \
     -DLLVM_SPIRV="$PREFIX/bin/llvm-spirv"
 
