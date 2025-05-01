@@ -49,7 +49,7 @@ export CXXFLAGS="$CFLAGS"
 # -fprofile-generate    # Instrument the program to collect profiling data at runtime (for use with PGO - Profile Guided Optimization)
 
 # export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -shared  -fprofile-generate"
-export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all -shared"
+export LDFLAGS="-flto -Wl,-O1 -Wl,--as-needed -Wl,--strip-all"
 # -flto                  # Enable Link Time Optimization (LTO) during linking for cross-module inlining and better optimization
 # -Wl,-O1                # Pass optimization level 1 to the linker (balance between speed and link-time complexity)
 # -Wl,--as-needed        # Only link shared libraries that are actually used (reduces dependencies and load time)
