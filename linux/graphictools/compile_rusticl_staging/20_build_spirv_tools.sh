@@ -11,8 +11,6 @@ PYTHON="$VENV/bin/python"
 PROFILE_DIR="$SCRIPT_DIR/spirv-tools-profile-data"
 SPIRV_CORPUS="$SCRIPT_DIR/spirv-tools-corpus"
 
-
-
 # === Load Colors and Helpers ===
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; RESET='\033[0m'
 log()    { echo -e "\n${CYAN}ℹ️  [INFO]${RESET} $1\n"; }
@@ -80,7 +78,9 @@ function run_profiling_load() {
 
   local tools_bin="$PREFIX/bin"
   local log_file="/tmp/spirv-pgo.log"
+  local skipped_file="/tmp/spirv-pgo-skipped.log"
   > "$log_file"
+  > "$skipped_file"
 
   find "$SPIRV_CORPUS" -type f -name "*.spv" | while read -r spv_file; do
     if "$tools_bin/spirv-opt" --O "$spv_file" -o /dev/null 2>>"$log_file"; then
@@ -100,7 +100,7 @@ function run_profiling_load() {
 
   if command -v glslangValidator &>/dev/null; then
     find "$SPIRV_CORPUS" -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \) \
-      ! -name "*.asm.*" ! -name "*.spvasm" ! -name "*.nonuniformresource.*" | while read -r shader; do
+      ! -name "*.asm.*" ! -name "*.spvasm" ! -name "*.nonuniformresource.*" ! -name "*.invalid.*" | while read -r shader; do
 
       log "🔍 Checking shader: $shader"
 
@@ -113,6 +113,7 @@ function run_profiling_load() {
         fi
       else
         warn "⚠️ Skipping invalid shader (missing #version or main): $shader"
+        echo "Skipped shader (invalid structure): $shader" >> "$skipped_file"
       fi
 
     done
@@ -120,7 +121,9 @@ function run_profiling_load() {
     warn "glslangValidator not found; skipping GLSL compilation"
   fi
 
-  success "Profiling workload complete. Logs saved to $log_file"
+  success "Profiling workload complete. Logs saved to:"
+  echo "  Compile errors: $log_file"
+  echo "  Skipped shaders: $skipped_file"
 }
 
 function clone_spirv_tools_repo() {
