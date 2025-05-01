@@ -100,11 +100,22 @@ function run_profiling_load() {
 
   if command -v glslangValidator &>/dev/null; then
     find "$SPIRV_CORPUS" -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \) \
-      ! -name "*.asm.*" ! -name "*.spvasm" ! -name "*.nonuniformresource.*" ! -name "*.invalid.*" | while read -r shader; do
+      ! -name "*.asm.*" ! -name "*.spvasm" ! -name "*.nonuniformresource.*" \
+      ! -name "*.invalid.*" ! -name "*.legacy.*" | while read -r shader; do
 
       log "🔍 Checking shader: $shader"
 
-      if grep -q "#version" "$shader" && grep -q "void main" "$shader"; then
+      local version_line version_number
+      version_line=$(grep "^#version" "$shader" | head -n1 || true)
+      version_number=$(echo "$version_line" | grep -oE '[0-9]+' || echo 0)
+
+      if [[ "$version_number" -lt 310 ]]; then
+        warn "⚠️ Skipping shader (GLSL version < 310): $shader"
+        echo "Skipped shader (version too low): $shader" >> "$skipped_file"
+        continue
+      fi
+
+      if grep -q "void main" "$shader"; then
         if glslangValidator -V "$shader" -o /dev/null 2>>"$log_file"; then
           log "✓ GLSL compiled: $shader"
         else
@@ -112,8 +123,8 @@ function run_profiling_load() {
           echo "GLSL compile failed: $shader" >> "$log_file"
         fi
       else
-        warn "⚠️ Skipping invalid shader (missing #version or main): $shader"
-        echo "Skipped shader (invalid structure): $shader" >> "$skipped_file"
+        warn "⚠️ Skipping invalid shader (missing main): $shader"
+        echo "Skipped shader (missing main): $shader" >> "$skipped_file"
       fi
 
     done
