@@ -36,6 +36,7 @@ fail()   { error "$1"; exit 1; }
 
 log "🛠️ Cleaning up old build directory"
 rm -rf "$BUILD_DIR"
+rm -rf "$VENV"
 rm -rf "$ROOT/mesa"
 
 # === Force GCC ===
