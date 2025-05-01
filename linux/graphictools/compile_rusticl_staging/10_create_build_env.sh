@@ -46,6 +46,7 @@ function setup_system_dependencies() {
     libxcb-sync-dev libxcb1-dev libxshmfence-dev libxxf86vm-dev
     meson ninja-build pkg-config python3-pip python3-setuptools
     valgrind wayland-protocols zlib1g-dev libzstd-dev curl
+    libcurl4-openssl-dev
   )
 
   debug "Installing required packages..."
