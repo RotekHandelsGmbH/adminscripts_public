@@ -55,8 +55,7 @@ function build_spirv_llvm_translator() {
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DLLVM_CONFIG="$LLVM_CONFIG" \
     -DCMAKE_PREFIX_PATH="$LLVM_PREFIX;$PREFIX" \
-    -DLLVM_DIR="$LLVM_PREFIX/lib/cmake/llvm" \
-    -DENABLE_LLVM_SPIRV=ON
+    -DLLVM_DIR="$LLVM_PREFIX/lib/cmake/llvm"
 
   cmake --build spirv-llvm-translator/build --target llvm-spirv -- -j$(nproc)
   sudo cmake --install spirv-llvm-translator/build
