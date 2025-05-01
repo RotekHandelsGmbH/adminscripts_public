@@ -5,11 +5,13 @@ set -euo pipefail
 PREFIX="/opt/mesa"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/spirv-tools-src"
-BUILD_DIR="$ROOT/build"
+BUILD_DIR="$ROOT/build-spirv-tools"
 VENV="$SCRIPT_DIR/env-jinja"
 PYTHON="$VENV/bin/python"
-PROFILE_DIR="$SCRIPT_DIR/profile-data"
-SPIRV_CORPUS="$SCRIPT_DIR/spirv-corpus"
+PROFILE_DIR="$SCRIPT_DIR/spirv-tools-profile-data"
+SPIRV_CORPUS="$SCRIPT_DIR/spirv-tools-corpus"
+
+
 
 # === Load Colors and Helpers ===
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; RESET='\033[0m'
@@ -19,6 +21,14 @@ warn()   { echo -e "${YELLOW}⚠️ [WARN]${RESET} $1"; }
 success(){ echo -e "${GREEN}✅ [SUCCESS]${RESET} $1"; }
 error()  { echo -e "${RED}❌ [ERROR]${RESET} $1" >&2; }
 fail()   { error "$1"; exit 1; }
+
+# === Clean old build ===
+log "🔧 Clean old build"
+rm -rf "${ROOT}"
+rm -rf "${BUILD_DIR}"
+rm -rf "${PROFILE_DIR}"
+rm -rf "${SPIRV_CORPUS}"
+
 
 function activate_virtualenv() {
   log "🔧 Activating Python virtual environment from: $VENV"
