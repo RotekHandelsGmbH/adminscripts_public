@@ -30,7 +30,11 @@ export CC=gcc
 export CXX=g++
 export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
 export CXXFLAGS="$CFLAGS"
-export LDFLAGS="-Wl,-O3 -flto"
+export LDFLAGS="-Wl,-O2 -flto -shared"
+
+# Recommended example for optimized shared library link
+# export CFLAGS="-O3 -march=native -flto -fPIC -ffunction-sections -fdata-sections"
+# export LDFLAGS="-flto -shared -Wl,--gc-sections -Wl,-O1 -Wl,-Bsymbolic"
 
 function activate_virtualenv() {
   log "🔧 Activating Python virtual environment from: $VENV"
