@@ -27,14 +27,6 @@ log "🛠️ Cleaning up old build directory"
 rm -rf "${ROOT}"
 
 # === Force GCC ===
-#log "🛠️ Forcing GCC as the compiler and setup compiler flags"
-#export CC=gcc
-#export CXX=g++
-#export CFLAGS="-O3 -march=native -mtune=native -flto -fomit-frame-pointer -fPIC"
-#export CXXFLAGS="$CFLAGS"
-#export LDFLAGS="-Wl,-O3 -flto"
-
-# === Force GCC ===
 log "🛠️ Forcing GCC as the compiler and setup compiler flags"
 # export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG -fprofile-generate"
 export CFLAGS="-O3 -march=native -flto -fPIC -fvisibility=hidden -fomit-frame-pointer -DNDEBUG"
