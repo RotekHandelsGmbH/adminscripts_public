@@ -66,23 +66,23 @@ def check_amdgpu():
 def parse_clinfo_blocks(text):
     blocks = []
     current = {}
+    in_device = False
+
     for line in text.splitlines():
         line = line.strip()
-        if not line or ":" not in line:
-            continue
-        key, val = map(str.strip, line.split(":", 1))
-        key_lc = key.lower()
-
-        if key_lc == "device name" and current:
-            blocks.append(current)
-            current = {}
-
-        current[key] = val
+        if line.startswith("Device Name"):
+            if current:
+                blocks.append(current)
+                current = {}
+            in_device = True
+        if in_device and ":" in line:
+            key, val = map(str.strip, line.split(":", 1))
+            current[key] = val
 
     if current:
         blocks.append(current)
 
-    # Filter only AMD GPUs
+    # Filter for AMD GPUs
     amd_gpus = []
     for d in blocks:
         vendor = d.get("Device Vendor", "").lower()
