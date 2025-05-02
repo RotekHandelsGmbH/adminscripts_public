@@ -133,17 +133,17 @@ def detect_amd_gpu_vulkan_full():
 
     gpus = []
     current = {}
-    in_props = False
+    in_device = False
     in_limits = False
 
     for line in output.splitlines():
         line = line.strip()
 
         if line.startswith("VkPhysicalDeviceProperties:"):
-            if current:
+            if current.get("name"):
                 gpus.append(current)
                 current = {}
-            in_props = True
+            in_device = True
             in_limits = False
             continue
 
@@ -151,11 +151,11 @@ def detect_amd_gpu_vulkan_full():
             in_limits = True
             continue
 
-        elif line.startswith("VkPhysicalDeviceMemoryProperties:"):
+        elif line.startswith("VkPhysicalDeviceMemoryProperties:") or line.startswith("Device Extensions:"):
             in_limits = False
             continue
 
-        elif in_props:
+        if in_device:
             if line.startswith("deviceName") and "AMD" in line:
                 current["name"] = line.split("=", 1)[-1].strip()
             elif line.startswith("driverVersion"):
@@ -165,7 +165,7 @@ def detect_amd_gpu_vulkan_full():
             elif line.startswith("apiVersion"):
                 current["api"] = line.split("=", 1)[-1].strip()
 
-        elif in_limits:
+        if in_limits:
             if line.startswith("maxImageDimension2D"):
                 current["max2d"] = line.split("=", 1)[-1].strip()
             elif line.startswith("maxComputeWorkGroupInvocations"):
@@ -173,7 +173,7 @@ def detect_amd_gpu_vulkan_full():
             elif line.startswith("maxComputeSharedMemorySize"):
                 current["shared_mem"] = line.split("=", 1)[-1].strip()
 
-    if current:
+    if current.get("name"):
         gpus.append(current)
 
     return len(gpus), gpus
