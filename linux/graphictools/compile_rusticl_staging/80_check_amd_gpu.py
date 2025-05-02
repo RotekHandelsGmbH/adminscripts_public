@@ -22,7 +22,6 @@ def info(msg: str):  print(f"{BLUE}[INFO]{NC}  {msg}")
 def warn(msg: str):  print(f"{YELL}[WARN]{NC}  {msg}")
 
 # --------------------------------------------------------------------------- #
-# Helper Routines
 def run(cmd: list[str]) -> str | None:
     try:
         return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True)
@@ -125,9 +124,14 @@ def check_opencl() -> bool:
         fail("Failed to execute clinfo.")
         return False
 
-    platforms = [line.split(":", 1)[1].strip()
-                 for line in clinfo_out.splitlines()
-                 if line.strip().startswith("Platform Name")]
+    # 🛠 Fixed platform detection logic
+    platforms = []
+    for line in clinfo_out.splitlines():
+        if "Platform Name" in line:
+            parts = line.strip().split(":", 1)
+            name = parts[1].strip() if len(parts) > 1 else parts[0].replace("Platform Name", "").strip()
+            if name:
+                platforms.append(name)
     info(f"Found OpenCL platform(s): {', '.join(platforms) or 'none'}")
 
     gpus = count_amd_gpus_clinfo(clinfo_out)
