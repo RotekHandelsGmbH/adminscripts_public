@@ -5,7 +5,7 @@ import shutil
 import subprocess
 from collections import defaultdict
 
-# Terminal Colors
+# Terminal colors
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
 BOLD_GREEN = '\033[1;32m'
@@ -68,12 +68,18 @@ def get_drive_temperature(device):
             for val in reversed(fields):
                 if val.isdigit() and 0 < int(val) < 150:
                     return f"🌡️ {val}°C,"
-    return "🌡️ Unknown,"
+    return "🌡️ N/A,"
 
-def color_link_speed(link):
-    if "6.0" in link or "SATA6" in link:
+def color_link_speed(link, max_iface=None):
+    speed_order = {"SATA?": 0, "SATA1": 1, "SATA3": 3, "SATA6": 6}
+    link_val = speed_order.get(link, 0)
+    max_val = speed_order.get(max_iface, 0)
+
+    if max_val and link_val < max_val:
+        return f"{RED}🧩 link={link}{NC}"
+    elif "SATA6" in link:
         return f"{GREEN}🧩 link={link}{NC}"
-    elif "3.0" in link or "SATA3" in link:
+    elif "SATA3" in link:
         return f"{YELLOW}🧩 link={link}{NC}"
     return f"🧩 link={link}"
 
@@ -103,7 +109,6 @@ def process_sata_disks():
         devpath = f"/sys/block/{disk}/device"
         controller = get_storage_controller(devpath)
         model = clean_model_name(run(f"cat /sys/block/{disk}/device/model"))
-        vendor = run(f"cat /sys/block/{disk}/device/vendor")
         size = run(f"lsblk -dn -o SIZE {device}")
         serial = get_smart_field(device, "Serial Number")
         firmware = get_smart_field(device, "Firmware Version")
@@ -113,7 +118,8 @@ def process_sata_disks():
         temperature = get_drive_temperature(device)
         info = run(f"smartctl -i {device}")
         iface, link = get_sata_version_and_link(info)
-        link_display = color_link_speed(link)
+        link_display = color_link_speed(link, iface)
+
         controller_disks[controller].append(
             f"{GREEN}💾 {device}{NC}  ({model}, {size}, {iface}, {link_display}, "
             f"{smart_health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
@@ -147,6 +153,7 @@ def process_nvme_disks():
             speed = run(f"cat /sys/class/nvme/{base}/device/current_link_speed")
             link = f"PCIe {speed} x{width}".strip()
             link_display = color_link_speed(link)
+
             controller_disks[controller].append(
                 f"{GREEN}💾 {nvdev}{NC}  ({model}, {size}, NVMe, {link_display}, "
                 f"{health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
