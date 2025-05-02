@@ -42,7 +42,6 @@ def detect_gpu_model():
     for line in lspci.splitlines():
         if "VGA" in line and ("AMD" in line or "ATI" in line):
             ok(f"GPU Detected: {line.strip()}")
-            # Extract PCIe info
             pcie_info = run(["lspci", "-vv", "-s", line.split()[0]])
             if pcie_info:
                 for l in pcie_info.splitlines():
@@ -62,7 +61,7 @@ def check_amdgpu():
     if count:
         ok(f"AMDGPU driver used by {count} GPU(s).")
     else:
-        fail("No GPU is using AMDGPU (maybe using radeon/proprietary?).")
+        fail("No GPU is using AMDGPU.")
         return False
 
     lsmod = run(["lsmod"]) or ""
@@ -73,6 +72,7 @@ def check_amdgpu():
     return True
 
 def check_opencl_details(clinfo):
+    printed = False
     devices = clinfo.split("\n\n")
     for dev in devices:
         if "Device Type" in dev and "GPU" in dev:
@@ -84,7 +84,9 @@ def check_opencl_details(clinfo):
                     if len(parts) == 2:
                         summary[parts[0].strip()] = parts[1].strip()
             if summary.get("Device Vendor", "").lower().startswith("amd"):
-                print("\nOpenCL GPU Summary:")
+                if not printed:
+                    print("\nOpenCL GPU Summary:")
+                    printed = True
                 print(f"  Name            : {summary.get('Device Name', 'N/A')}")
                 print(f"  Compute Units   : {summary.get('Max compute units', 'N/A')}")
                 print(f"  Clock Frequency : {summary.get('Max clock frequency', 'N/A')} MHz")
@@ -146,7 +148,6 @@ def detect_amd_gpu_vulkan_full():
 
     for line in output.splitlines():
         line = line.strip()
-
         if line.startswith("VkPhysicalDeviceProperties:"):
             if current.get("name"):
                 gpus.append(current)
@@ -154,11 +155,9 @@ def detect_amd_gpu_vulkan_full():
             in_device = True
             in_limits = False
             continue
-
         elif line.startswith("VkPhysicalDeviceLimits:"):
             in_limits = True
             continue
-
         elif line.startswith("VkPhysicalDeviceMemoryProperties:") or line.startswith("Device Extensions:"):
             in_limits = False
             continue
@@ -177,8 +176,6 @@ def detect_amd_gpu_vulkan_full():
             if line.startswith("maxImageDimension2D"):
                 dim = line.split("=", 1)[-1].strip()
                 current["max2d"] = f"{dim}x{dim}"
-            elif line.startswith("maxComputeWorkGroupInvocations"):
-                current["compute_units"] = line.split("=", 1)[-1].strip()
             elif line.startswith("maxComputeSharedMemorySize"):
                 current["shared_mem"] = line.split("=", 1)[-1].strip()
 
@@ -204,10 +201,9 @@ def check_vulkan():
             print(f"  Type            : {gpu.get('type', 'N/A')}")
             print(f"  API Version     : {gpu.get('api', 'N/A')}")
             print(f"  Max 2D Dim      : {gpu.get('max2d', 'N/A')}")
-            print(f"  Compute Units   : {gpu.get('compute_units', 'N/A')}")
             print(f"  Shared Mem Size : {gpu.get('shared_mem', 'N/A')} bytes")
 
-            # Attempt to parse bus width and clock dynamically from clinfo or lspci
+            # Estimate memory bandwidth from clinfo and lspci
             bus_width_bits = 384
             mem_clock_mhz = 1375
             lspci_data = run(["lspci", "-vv"])
