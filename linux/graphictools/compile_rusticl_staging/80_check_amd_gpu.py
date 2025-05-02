@@ -75,29 +75,37 @@ def check_amdgpu():
 
 def check_opencl_details(clinfo):
     lines = clinfo.splitlines()
+    device_blocks = []
     current = {}
-    printed = False
     for line in lines:
         line = line.strip()
         if not line:
             continue
+        if line.startswith("Device Name"):
+            if current:
+                device_blocks.append(current)
+                current = {}
         if ":" in line:
             key, val = map(str.strip, line.split(":", 1))
             current[key] = val
-        if line.startswith("Max compute units"):
-            vendor = current.get("Device Vendor", "").lower()
-            devtype = current.get("Device Type", "").lower()
-            if any(v in vendor for v in ["amd", "ati", "advanced micro devices", "amd inc"]) and "gpu" in devtype:
-                if not printed:
-                    print("\nOpenCL GPU Summary:")
-                    printed = True
-                print(f"  Name            : {current.get('Device Name', 'N/A')}")
-                print(f"  Compute Units   : {current.get('Max compute units', 'N/A')}")
-                print(f"  Clock Frequency : {current.get('Max clock frequency', 'N/A')} MHz")
-                print(f"  Global Memory   : {int(current.get('Global memory size', '0')) // (1024 ** 2)} MiB")
-                print(f"  Local Memory    : {int(current.get('Local memory size', '0')) // 1024} KiB")
-                print(f"  OpenCL C Ver    : {current.get('Device OpenCL C Version', 'N/A')}")
-                current = {}
+    if current:
+        device_blocks.append(current)
+
+    printed = False
+    for device in device_blocks:
+        vendor = device.get("Device Vendor", "").lower()
+        devtype = device.get("Device Type", "").lower()
+        if any(v in vendor for v in ["amd", "ati", "advanced micro devices", "amd inc"]) and "gpu" in devtype:
+            if not printed:
+                print("\nOpenCL GPU Summary:")
+                printed = True
+            print(f"  Name            : {device.get('Device Name', 'N/A')}")
+            print(f"  Compute Units   : {device.get('Max compute units', 'N/A')}")
+            print(f"  Clock Frequency : {device.get('Max clock frequency', 'N/A')} MHz")
+            print(f"  Global Memory   : {int(device.get('Global memory size', '0')) // (1024 ** 2)} MiB")
+            print(f"  Local Memory    : {int(device.get('Local memory size', '0')) // 1024} KiB")
+            print(f"  OpenCL C Ver    : {device.get('Device OpenCL C Version', 'N/A')}")
+            print(f"  Extensions      : {device.get('Device Extensions', 'N/A')[:80]}...")
 
 def check_opencl():
     info("Checking OpenCL runtime …")
