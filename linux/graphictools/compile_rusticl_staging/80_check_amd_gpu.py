@@ -174,9 +174,23 @@ def check_opencl() -> bool:
     return False
 
 # --------------------------------------------------------------------------- #
-def detect_amd_gpu_vulkan_full() -> bool:
+def detect_amd_gpu_vulkan_full() -> tuple[int, list[dict]]:
     output = run(["vulkaninfo"])
-    return output is not None and any("deviceName" in line and "AMD" in line for line in output.splitlines())
+    if not output:
+        return 0, []
+    gpus = []
+    current = {}
+    for line in output.splitlines():
+        line = line.strip()
+        if line.startswith("deviceName") and "AMD" in line:
+            current["name"] = line.split("=", 1)[1].strip()
+        elif line.startswith("driverVersion") and current:
+            current["driver"] = line.split("=", 1)[1].strip()
+        elif line.startswith("deviceUUID") and current:
+            current["uuid"] = line.split("=", 1)[1].strip()
+            gpus.append(current)
+            current = {}
+    return len(gpus), gpus
 
 def check_vulkan() -> bool:
     info("Checking Vulkan stack …")
@@ -186,15 +200,20 @@ def check_vulkan() -> bool:
         return False
 
     summary = run(["vulkaninfo", "--summary"])
-    if summary and "AMD" in summary:
-        driver = next((line.split(":", 1)[1].strip()
-                       for line in summary.splitlines()
-                       if "Driver Name" in line), "unknown")
-        ok(f"AMD GPU detected via Vulkan  [Driver: {driver}]")
-        return True
+    driver = "unknown"
+    if summary:
+        for line in summary.splitlines():
+            if "Driver Name" in line:
+                driver = line.split(":", 1)[1].strip()
+                break
 
-    if detect_amd_gpu_vulkan_full():
-        ok("AMD GPU detected via Vulkan (Fallback through full scan).")
+    gpu_count, devices = detect_amd_gpu_vulkan_full()
+    if gpu_count > 0:
+        ok(f"AMD GPU(s) detected via Vulkan – Count: {gpu_count}")
+        for dev in devices:
+            info(f"Vulkan GPU: {dev.get('name')} | Driver: {dev.get('driver')} | UUID: {dev.get('uuid')}")
+        if driver != "unknown":
+            info(f"Driver (from summary): {driver}")
         return True
 
     fail("No AMD GPU device detected through Vulkan ICD.")
