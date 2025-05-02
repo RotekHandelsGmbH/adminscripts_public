@@ -133,7 +133,8 @@ def detect_amd_gpu_vulkan_full():
 
     gpus = []
     current = {}
-    in_gpu_section = False
+    in_props = False
+    in_limits = False
 
     for line in output.splitlines():
         line = line.strip()
@@ -142,33 +143,35 @@ def detect_amd_gpu_vulkan_full():
             if current:
                 gpus.append(current)
                 current = {}
-            in_gpu_section = True
+            in_props = True
+            in_limits = False
             continue
 
-        if in_gpu_section:
+        elif line.startswith("VkPhysicalDeviceLimits:"):
+            in_limits = True
+            continue
+
+        elif line.startswith("VkPhysicalDeviceMemoryProperties:"):
+            in_limits = False
+            continue
+
+        elif in_props:
             if line.startswith("deviceName") and "AMD" in line:
-                current["name"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
-
+                current["name"] = line.split("=", 1)[-1].strip()
             elif line.startswith("driverVersion"):
-                current["driver"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
-
-            elif line.startswith("deviceUUID"):
-                current["uuid"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
-
+                current["driver"] = line.split("=", 1)[-1].strip()
             elif line.startswith("deviceType"):
-                current["type"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
-
+                current["type"] = line.split("=", 1)[-1].strip()
             elif line.startswith("apiVersion"):
-                current["api"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
+                current["api"] = line.split("=", 1)[-1].strip()
 
-            elif line.startswith("maxImageDimension2D"):
-                current["max2d"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
-
-            elif line == "":
-                if current:
-                    gpus.append(current)
-                    current = {}
-                in_gpu_section = False
+        elif in_limits:
+            if line.startswith("maxImageDimension2D"):
+                current["max2d"] = line.split("=", 1)[-1].strip()
+            elif line.startswith("maxComputeWorkGroupInvocations"):
+                current["compute_units"] = line.split("=", 1)[-1].strip()
+            elif line.startswith("maxComputeSharedMemorySize"):
+                current["shared_mem"] = line.split("=", 1)[-1].strip()
 
     if current:
         gpus.append(current)
@@ -189,10 +192,11 @@ def check_vulkan():
             print("\nVulkan GPU Summary:")
             print(f"  Name            : {gpu.get('name', 'N/A')}")
             print(f"  Driver Version  : {gpu.get('driver', 'N/A')}")
-            print(f"  UUID            : {gpu.get('uuid', 'N/A')}")
             print(f"  Type            : {gpu.get('type', 'N/A')}")
             print(f"  API Version     : {gpu.get('api', 'N/A')}")
             print(f"  Max 2D Dim      : {gpu.get('max2d', 'N/A')}")
+            print(f"  Compute Units   : {gpu.get('compute_units', 'N/A')}")
+            print(f"  Shared Mem Size : {gpu.get('shared_mem', 'N/A')} bytes")
         return True
 
     fail("No AMD GPU detected via Vulkan.")
