@@ -124,7 +124,6 @@ def check_opencl() -> bool:
         fail("Failed to execute clinfo.")
         return False
 
-    # ✅ Deduplicated platform detection
     platforms = set()
     for line in clinfo_out.splitlines():
         if "Platform Name" in line:
@@ -191,11 +190,20 @@ def main() -> None:
     print()
     check_rocm()
     print()
+
     if success:
         ok("All main checks passed – system ready. 🎉")
-        sys.exit(0)
-    fail("At least one check failed – see above.")
-    sys.exit(1)
+    else:
+        fail("At least one check failed – see above.")
+
+    print()
+    info("For detailed inspection, use:")
+    print("   lspci | grep -i vga")
+    print("   clinfo")
+    print("   vulkaninfo")
+    print("   rocminfo")
+
+    sys.exit(0 if success else 1)
 
 # --------------------------------------------------------------------------- #
 if __name__ == "__main__":
