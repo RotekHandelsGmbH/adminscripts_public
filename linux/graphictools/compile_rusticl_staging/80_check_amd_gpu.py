@@ -183,11 +183,11 @@ def check_vulkan() -> bool:
 
         amd_devices = [d for d in devices if "deviceName" in d and "amd" in d["deviceName"].lower()]
         if amd_devices:
-        ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(amd_devices)}")
-        for i, d in enumerate(amd_devices, 1):
-            print(f"OpenCL GPU #{i}:")
-            for key, value in d.items():
-                print(f"  {key:<25}: {value}")
+            ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(amd_devices)}")
+            for i, d in enumerate(amd_devices, 1):
+                print(f"OpenCL GPU #{i}:")
+                for key, value in d.items():
+                    print(f"  {key:<25}: {value}")
 
         used_impls = [f.name.lower() for f in icd_files]
         if any("rusticl" in impl for impl in used_impls):
