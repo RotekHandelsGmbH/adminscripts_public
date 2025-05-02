@@ -62,12 +62,10 @@ def parse_opencl_devices(text):
     current_device = {}
     for line in text.splitlines():
         line = line.strip()
-
         if "Platform Name" in line:
             parts = line.split(":", 1) if ":" in line else line.split(None, 2)
             if len(parts) > 1:
                 platforms.add(parts[-1].strip())
-
         if "Device Name" in line:
             if current_device:
                 devices.append(current_device)
@@ -83,16 +81,12 @@ def parse_opencl_devices(text):
         else:
             continue
         current_device[key] = val
-
     if current_device:
         devices.append(current_device)
-
-    amd_devices = [
-        d for d in devices
-        if "Device Vendor" in d and "Device Type" in d
-        and "gpu" in d["Device Type"].lower()
-        and re.search(r"amd|advanced micro devices", d["Device Vendor"], re.I)
-    ]
+    amd_devices = [d for d in devices if
+                   "Device Vendor" in d and "Device Type" in d and
+                   "gpu" in d["Device Type"].lower() and
+                   re.search(r"amd|advanced micro devices", d["Device Vendor"], re.I)]
     return platforms, amd_devices
 
 def summarize_opencl(d):
@@ -116,12 +110,12 @@ def check_opencl():
     if not command_exists("clinfo"):
         fail("clinfo is not installed.")
         print(f"→ {suggest('clinfo')}")
-        return False
+        return False, None
 
     clinfo_out = run(["clinfo"])
     if not clinfo_out:
         fail("Failed to run clinfo.")
-        return False
+        return False, None
 
     platforms, gpus = parse_opencl_devices(clinfo_out)
     info(f"Found OpenCL platform(s): {', '.join(sorted(platforms)) or 'none'}")
@@ -129,15 +123,19 @@ def check_opencl():
     if gpus:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(gpus)}")
         summarize_opencl(gpus[0])
-        return True
+        # Fallback memory estimate
+        raw = gpus[0].get("Global memory size", "")
+        if raw.isdigit():
+            return True, f"{int(raw) // 1024 ** 2} MiB"
+        return True, None
 
     if any("rusticl" in p.lower() for p in platforms):
         warn("Rusticl platform detected, but no GPU available – possible limitations.")
     else:
         fail("No AMD GPU found in OpenCL device list.")
-    return False
+    return False, None
 
-def parse_vulkan_devices(text):
+def parse_vulkan_devices(text, fallback_mem=None):
     devices = []
     current_device = {}
     mem_heaps = []
@@ -145,13 +143,11 @@ def parse_vulkan_devices(text):
 
     for line in text.splitlines():
         line = line.strip()
-
         if "VkPhysicalDeviceProperties:" in line:
             if current_device:
                 devices.append(current_device)
                 current_device = {}
             mem_heaps = []
-
         if "=" in line:
             key, val = map(str.strip, line.split("=", 1))
             if key in [
@@ -159,7 +155,6 @@ def parse_vulkan_devices(text):
                 "maxComputeWorkGroupInvocations", "maxComputeSharedMemorySize"
             ]:
                 current_device[key] = val
-
         if "heapFlags = DEVICE_LOCAL_BIT" in line:
             in_heap = True
         elif in_heap and "size =" in line:
@@ -170,7 +165,9 @@ def parse_vulkan_devices(text):
 
     if current_device:
         if mem_heaps:
-            current_device["Total Device Local Memory"] = f"{sum(mem_heaps) // 1024**2} MiB"
+            current_device["Total Device Local Memory"] = f"{sum(mem_heaps) // 1024 ** 2} MiB"
+        elif fallback_mem:
+            current_device["Total Device Local Memory"] = fallback_mem
         else:
             current_device["Total Device Local Memory"] = "N/A"
         devices.append(current_device)
@@ -187,7 +184,7 @@ def summarize_vulkan(d):
     print(f"  maxComputeWorkGroupInvocations : {d.get('maxComputeWorkGroupInvocations')}")
     print(f"  maxComputeSharedMemorySize     : {d.get('maxComputeSharedMemorySize')}")
 
-def check_vulkan():
+def check_vulkan(fallback_mem=None):
     info("Checking Vulkan stack …")
     if not command_exists("vulkaninfo"):
         fail("vulkaninfo not found.")
@@ -199,7 +196,7 @@ def check_vulkan():
         fail("vulkaninfo execution failed.")
         return False
 
-    devices = parse_vulkan_devices(vulkan_out)
+    devices = parse_vulkan_devices(vulkan_out, fallback_mem)
     if devices:
         ok(f"AMD GPU(s) detected via Vulkan – Count: {len(devices)}")
         summarize_vulkan(devices[0])
@@ -212,9 +209,9 @@ def main():
     print()
     check_amdgpu()
     print()
-    opencl_ok = check_opencl()
+    opencl_ok, fallback_mem = check_opencl()
     print()
-    vulkan_ok = check_vulkan()
+    vulkan_ok = check_vulkan(fallback_mem)
     print()
     if opencl_ok and vulkan_ok:
         ok("All main checks passed – system ready. 🎉")
