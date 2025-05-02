@@ -167,7 +167,8 @@ def detect_amd_gpu_vulkan_full():
 
         if in_limits:
             if line.startswith("maxImageDimension2D"):
-                current["max2d"] = line.split("=", 1)[-1].strip()
+                dim = line.split("=", 1)[-1].strip()
+                current["max2d"] = f"{dim}x{dim}"
             elif line.startswith("maxComputeWorkGroupInvocations"):
                 current["compute_units"] = line.split("=", 1)[-1].strip()
             elif line.startswith("maxComputeSharedMemorySize"):
