@@ -185,8 +185,7 @@ def check_vulkan() -> bool:
         if amd_devices:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(amd_devices)}")
         for i, d in enumerate(amd_devices, 1):
-            print(f"
-OpenCL GPU #{i}:")
+            print(f"OpenCL GPU #{i}:")
             for key, value in d.items():
                 print(f"  {key:<25}: {value}")
 
