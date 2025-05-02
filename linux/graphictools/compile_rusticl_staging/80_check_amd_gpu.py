@@ -15,10 +15,10 @@ BLUE  = "\033[1;34m"
 YELL  = "\033[1;33m"
 NC    = "\033[0m"
 
-def ok(msg):    print(f"{GREEN}✅ {msg}{NC}")
-def fail(msg):  print(f"{RED}❌ {msg}{NC}")
-def info(msg):  print(f"{BLUE}[INFO]{NC}  {msg}")
-def warn(msg):  print(f"{YELL}[WARN]{NC}  {msg}")
+def ok(msg): print(f"{GREEN}✅ {msg}{NC}")
+def fail(msg): print(f"{RED}❌ {msg}{NC}")
+def info(msg): print(f"{BLUE}[INFO]{NC}  {msg}")
+def warn(msg): print(f"{YELL}[WARN]{NC}  {msg}")
 
 def run(cmd):
     try:
@@ -60,8 +60,6 @@ def parse_opencl_devices(text):
     platforms = set()
     devices = []
     current_device = {}
-    in_device = False
-
     for line in text.splitlines():
         line = line.strip()
 
@@ -72,31 +70,49 @@ def parse_opencl_devices(text):
 
         if "Device Name" in line:
             if current_device:
-                if "Device Vendor" in current_device and "Device Type" in current_device:
-                    if "gpu" in current_device["Device Type"].lower() and re.search(r"amd|advanced micro devices", current_device["Device Vendor"], re.I):
-                        devices.append(current_device)
+                devices.append(current_device)
                 current_device = {}
-            in_device = True
-
-        if in_device and (":" in line or re.search(r" {2,}", line)):
-            try:
-                if ":" in line:
-                    key, val = map(str.strip, line.split(":", 1))
-                else:
-                    parts = re.split(r" {2,}", line)
-                    if len(parts) >= 2:
-                        key, val = parts[0].strip(), parts[1].strip()
-                    else:
-                        continue
-                current_device[key] = val
-            except ValueError:
+        if ":" in line:
+            key, val = map(str.strip, line.split(":", 1))
+        elif re.search(r" {2,}", line):
+            parts = re.split(r" {2,}", line)
+            if len(parts) >= 2:
+                key, val = parts[0], parts[1]
+            else:
                 continue
+        else:
+            continue
+        current_device[key] = val
 
-    if current_device and "Device Vendor" in current_device and "Device Type" in current_device:
-        if "gpu" in current_device["Device Type"].lower() and re.search(r"amd|advanced micro devices", current_device["Device Vendor"], re.I):
-            devices.append(current_device)
+    if current_device:
+        devices.append(current_device)
 
-    return platforms, devices
+    amd_devices = [
+        d for d in devices
+        if "Device Vendor" in d and "Device Type" in d
+        and "gpu" in d["Device Type"].lower()
+        and re.search(r"amd|advanced micro devices", d["Device Vendor"], re.I)
+    ]
+    return platforms, amd_devices
+
+def summarize_opencl(d):
+    print("\n📌 OpenCL Device Summary:")
+    print(f"  Device Name                 : {d.get('Device Name')}")
+    print(f"  Device Type                 : {d.get('Device Type')}")
+    print(f"  Max Compute Units           : {d.get('Max compute units')}")
+    print(f"  Max Clock Frequency         : {d.get('Max clock frequency')}")
+    print(f"  Global Memory Size          : {d.get('Global memory size')} bytes")
+    print(f"  Max Memory Allocation       : {d.get('Max memory allocation')} bytes")
+    print(f"  Local Memory Size           : {d.get('Local memory size')} bytes")
+    print(f"  Max Constant Buffer Size    : {d.get('Max constant buffer size')} bytes")
+    print(f"  Max Work Group Size         : {d.get('Max work group size')}")
+    print(f"  Preferred WG Size Multiple  : {d.get('Preferred work group size multiple (device)')}")
+    print(f"  Max Work Item Sizes         : {d.get('Max work item sizes')}")
+    print(f"  OpenCL C Version            : {d.get('Device OpenCL C Version')}")
+    print(f"  IL Version                  : {d.get('IL version')}")
+    extensions = [k for k in d.keys() if k.startswith("cl_khr") or k.startswith("cles_khr")]
+    if extensions:
+        print(f"  Key Extensions              : {', '.join(extensions)}")
 
 def check_opencl():
     info("Checking OpenCL runtime …")
@@ -115,10 +131,7 @@ def check_opencl():
 
     if gpus:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(gpus)}")
-        for idx, d in enumerate(gpus, 1):
-            print(f"\nOpenCL GPU #{idx}:")
-            for key, val in d.items():
-                print(f"  {key:<30}: {val}")
+        summarize_opencl(gpus[0])
         return True
 
     if any("rusticl" in p.lower() for p in platforms):
@@ -130,6 +143,7 @@ def check_opencl():
 def parse_vulkan_devices(text):
     devices = []
     device = {}
+    total_mem = 0
     for line in text.splitlines():
         line = line.strip()
         if "VkPhysicalDeviceProperties:" in line:
@@ -138,11 +152,27 @@ def parse_vulkan_devices(text):
                 device = {}
         if "=" in line:
             key, val = map(str.strip, line.split("=", 1))
-            if key in ["deviceName", "driverVersion", "apiVersion", "deviceType"]:
+            if key in ["deviceName", "driverVersion", "apiVersion", "deviceType", "maxComputeWorkGroupInvocations", "maxComputeSharedMemorySize"]:
                 device[key] = val
+        if "heapFlags = DEVICE_LOCAL_BIT" in line:
+            m = re.search(r"size = (\d+)", line)
+            if m:
+                total_mem += int(m.group(1))
     if device:
+        if total_mem:
+            device["Total Device Local Memory"] = f"{total_mem // 1024 ** 2} MiB"
         devices.append(device)
     return [d for d in devices if "deviceName" in d and "amd" in d["deviceName"].lower()]
+
+def summarize_vulkan(d):
+    print("\n📌 Vulkan Device Summary:")
+    print(f"  Device Name                 : {d.get('deviceName')}")
+    print(f"  Driver Version              : {d.get('driverVersion')}")
+    print(f"  Device Type                 : {d.get('deviceType')}")
+    print(f"  Vulkan API Version          : {d.get('apiVersion')}")
+    print(f"  Local Device Memory         : {d.get('Total Device Local Memory', 'N/A')}")
+    print(f"  maxComputeWorkGroupInvocations : {d.get('maxComputeWorkGroupInvocations', 'N/A')}")
+    print(f"  maxComputeSharedMemorySize     : {d.get('maxComputeSharedMemorySize', 'N/A')}")
 
 def check_vulkan():
     info("Checking Vulkan stack …")
@@ -159,11 +189,7 @@ def check_vulkan():
     devices = parse_vulkan_devices(vulkan_out)
     if devices:
         ok(f"AMD GPU(s) detected via Vulkan – Count: {len(devices)}")
-        for idx, d in enumerate(devices, 1):
-            print(f"\nVulkan GPU #{idx}:")
-            for key in ["deviceName", "driverVersion", "deviceType", "apiVersion"]:
-                if key in d:
-                    print(f"  {key:<20}: {d[key]}")
+        summarize_vulkan(devices[0])
         return True
 
     fail("No AMD GPU device detected through Vulkan.")
