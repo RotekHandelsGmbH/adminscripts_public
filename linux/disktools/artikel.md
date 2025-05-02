@@ -34,6 +34,7 @@ Gerade im Fehlerfall – wenn z.B. RAID-Volumes zusammenbrechen oder SMART-Fehle
 * *Wie ist der Gesundheitszustand der anderen Laufwerke im selben Controller?*
 * *Laufen alle Platten mit der erwarteten Link-Speed (z.B. SATA6 statt SATA3)?*
 * *auf welchem HBA kann ich vielleicht noch eine Platte dazuquetschen ?*
+* *welche NVMEs benötigen ein Firmwareupdate ?*
 
 Genau hier spielt das Skript seine Stärke aus: Statt Dutzende Tools aufzurufen und Informationen manuell zu korrelieren, bekommt man sofort eine farblich strukturierte, logisch gruppierte Übersicht – direkt im Terminal.
 
@@ -53,7 +54,7 @@ Genau hier spielt das Skript seine Stärke aus: Statt Dutzende Tools aufzurufen 
 
 ## ⚙️ So funktioniert’s
 
-Das Skript nutzt systemnahe Werkzeuge (`smartctl`, `nvme`, `lsblk`, `lspci`) und parst deren Ausgaben, um relevante Informationen zu extrahieren und übersichtlich darzustellen. Schwache Linkgeschwindigkeiten werden z.B. rot hervorgehoben – ein häufig übersehenes Performanceproblem.
+Das Skript nutzt systemnahe Werkzeuge (`smartctl`, `nvme`, `lsblk`, `lspci`) und parst deren Ausgaben, um relevante Informationen zu extrahieren und übersichtlich darzustellen. Liegt die Linkgeschwindigkeit unter den Möglichkeiten des Drives, so wird dies z.B. rot hervorgehoben – ein häufig übersehenes Performanceproblemchen.
 
 **Ausführung:**
 
