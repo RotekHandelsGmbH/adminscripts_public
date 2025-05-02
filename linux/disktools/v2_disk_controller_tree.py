@@ -153,8 +153,8 @@ def process_nvme_disks():
             link_display = color_link_speed(link)
 
             controller_disks[controller].append(
-                f"{GREEN}💾 {nvdev}{NC}  ({model}, {size}, NVMe, {link_display}, "
-                f"{health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
+                f"{GREEN}💾 {nvdev}{NC}  {model}, {size}, NVMe, {link_display}, "
+                f"{health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware}"
             )
 
 def print_output():
