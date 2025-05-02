@@ -23,7 +23,7 @@ NC = '\033[0m'
 
 def run(cmd):
     try:
-        return subprocess.check_output(cmd, shell=True, text=True).strip()
+        return subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         return ""
 
@@ -55,16 +55,30 @@ def check_dependencies():
 
 def get_storage_controller(devpath):
     try:
-        real_path = run(f"realpath {devpath}")
+        real_path = os.path.realpath(devpath)
         addresses = re.findall(r'([0-9a-f]{2}:[0-9a-f]{2}\.[0-9])', real_path)
         for addr in reversed(addresses):
-            ctrl_line = run(f"lspci -s {addr}")
+            ctrl_line = run(f"lspci -s {addr}").strip()
             if re.search(r'sata|raid|sas|storage controller|non-volatile', ctrl_line, re.IGNORECASE):
                 parts = ctrl_line.split(":", 2)
                 return f"{addr} {parts[-1].strip()}"
     except Exception:
         pass
     return "Unknown Controller"
+
+def parse_smartctl_output(output, key):
+    for line in output.splitlines():
+        if key.lower() in line.lower():
+            parts = line.split(":", 1)
+            if len(parts) == 2:
+                return parts[1].strip()
+    return "unknown"
+
+def parse_smart_health(output):
+    for line in output.splitlines():
+        if 'smart' in line.lower() and ('result' in line.lower() or 'assessment' in line.lower()):
+            return line.split(":", 1)[-1].strip()
+    return ""
 
 def format_smart_health(status):
     if status.upper() in ('PASSED', 'OK', '0'):
@@ -77,12 +91,18 @@ def format_smart_health(status):
 def get_drive_temperature(device, dtype):
     if dtype == "sata":
         output = run(f"smartctl -A {device}")
-        match = re.search(r'(?i)(Temp|Temperature).*?([0-9]+)', output)
-        return f"🌡️ {match.group(2)}°C," if match else "🌡️ N/A,"
+        for line in output.splitlines():
+            if 'temp' in line.lower() and len(line.split()) >= 10:
+                temp = line.split()[9]
+                if temp.isdigit():
+                    return f"🌡️ {temp}°C,"
     elif dtype == "nvme":
         output = run(f"nvme smart-log {device}")
-        match = re.search(r'Temperature\s*:\s*([0-9]+)', output, re.IGNORECASE)
-        return f"🌡️ {match.group(1)}°C," if match else "🌡️ N/A,"
+        for line in output.splitlines():
+            if line.strip().lower().startswith("temperature"):
+                temp = re.search(r'(\d+)', line)
+                if temp:
+                    return f"🌡️ {temp.group(1)}°C,"
     return "🌡️ N/A,"
 
 def color_link_speed(link):
@@ -96,14 +116,13 @@ def color_link_speed(link):
 
 def get_smart_field(device, label):
     output = run(f"smartctl -i {device}")
-    match = re.search(f"{label}:\\s*(.+)", output, re.IGNORECASE)
-    return match.group(1).strip() if match else "unknown"
+    return parse_smartctl_output(output, label)
 
 def pci_sort_key(controller_id):
     match = re.match(r'([0-9a-f]{2}):([0-9a-f]{2})\.([0-9])', controller_id)
     if match:
         return tuple(int(x, 16) for x in match.groups())
-    return (999, 999, 999)  # unknowns at end
+    return (999, 999, 999)
 
 # ── Disk Scanning ─────────────────────────────────────────────────────────────────────
 
@@ -116,16 +135,24 @@ def process_sata_disks():
         devpath = f"/sys/block/{dev}/device"
         controller = get_storage_controller(devpath)
 
-        model = run(f"cat {devpath}/model")
-        vendor = run(f"cat {devpath}/vendor")
-        size = run(f"lsblk -dn -o SIZE {device}")
+        model = run(f"cat {devpath}/model").strip()
+        vendor = run(f"cat {devpath}/vendor").strip()
+        size = run(f"lsblk -dn -o SIZE {device}").strip()
         serial = get_smart_field(device, "Serial Number")
         firmware = get_smart_field(device, "Firmware Version")
-        smart_health = format_smart_health(run(f"smartctl -H {device} | grep -iE 'SMART.*(result|assessment)' | awk -F: '{{print $2}}'"))
+        smart_health_raw = run(f"smartctl -H {device}")
+        smart_health = format_smart_health(parse_smart_health(smart_health_raw))
         temperature = get_drive_temperature(device, "sata")
-        protocol = run(f"smartctl -i {device} | grep -E 'Transport protocol|SATA Version' | sed -n 's/.*SATA Version is:[[:space:]]*\\([^ ]*\\).*/\\1/p'")
-        linkspeed = run(f"smartctl -i {device} | grep -oP 'current:\\s*\\K[^)]+' | head -1") or \
-                    run(f"smartctl -i {device} | grep -oP 'SATA.*,[[:space:]]*\\K[0-9.]+ Gb/s' | head -1")
+
+        info = run(f"smartctl -i {device}")
+        protocol = ""
+        linkspeed = ""
+        for line in info.splitlines():
+            if "SATA Version" in line:
+                protocol = line.split(":", 1)[-1].strip()
+            if "current" in line.lower() and "Gb/s" in line:
+                linkspeed = re.search(r'([\d.]+ Gb/s)', line)
+                linkspeed = linkspeed.group(1) if linkspeed else ""
         link_display = color_link_speed(linkspeed or "unknown")
 
         CONTROLLER_DISKS[controller].append(
@@ -147,23 +174,34 @@ def process_nvme_disks():
             print(f"{RED}⚠️  Failed to read NVMe info from {nvdev} — skipping.{NC}")
             continue
 
-        def grep_val(pattern):
-            m = re.search(pattern + r'\s*:\s*(.*)', idctrl)
-            return m.group(1).strip() if m else "??"
+        def grep_val(field):
+            for line in idctrl.splitlines():
+                if line.strip().lower().startswith(field.lower()):
+                    return line.split(":", 1)[-1].strip()
+            return "??"
 
         model = grep_val("MN")
         vendorid = grep_val("VID")
         serial = grep_val("SN")
         firmware = grep_val("FR")
         size = run(f"lsblk -dn -o SIZE {nvdev}")
-        crit_warn = run(f"nvme smart-log {nvdev} | awk -F: '/^critical_warning/ {{print $2}}'")
-        smart_health = format_smart_health(crit_warn)
+        crit_warn = run(f"nvme smart-log {nvdev}")
+        crit_warn_val = grep_val("critical_warning")
+        smart_health = format_smart_health(crit_warn_val)
         temperature = get_drive_temperature(nvdev, "nvme")
 
         base = entry[:-2]
-        width = run(f"cat /sys/class/nvme/{base}/device/current_link_width")
-        speed = run(f"cat /sys/class/nvme/{base}/device/current_link_speed")
-        link = f"PCIe {speed or 'unknown'} PCIe x{width or 'unknown'}"
+        width_path = f"/sys/class/nvme/{base}/device/current_link_width"
+        speed_path = f"/sys/class/nvme/{base}/device/current_link_speed"
+        try:
+            with open(width_path) as f:
+                width = f.read().strip()
+            with open(speed_path) as f:
+                speed = f.read().strip()
+        except:
+            width, speed = "unknown", "unknown"
+
+        link = f"PCIe {speed} PCIe x{width}"
         link_display = color_link_speed(link)
 
         CONTROLLER_DISKS[controller].append(
