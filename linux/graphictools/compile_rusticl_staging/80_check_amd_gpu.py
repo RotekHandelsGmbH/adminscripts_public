@@ -65,29 +65,32 @@ def check_amdgpu():
 
 def parse_clinfo_blocks(text):
     blocks = []
-    current_block = []
+    current = {}
     for line in text.splitlines():
-        if line.strip().lower().startswith("device name"):
-            if current_block:
-                blocks.append(current_block)
-                current_block = []
-        if line.strip():
-            current_block.append(line.strip())
-    if current_block:
-        blocks.append(current_block)
+        line = line.strip()
+        if not line or ":" not in line:
+            continue
+        key, val = map(str.strip, line.split(":", 1))
+        key_lc = key.lower()
 
-    valid = []
-    for block in blocks:
-        d = {}
-        for line in block:
-            if ":" in line:
-                k, v = map(str.strip, line.split(":", 1))
-                d[k] = v
+        if key_lc == "device name" and current:
+            blocks.append(current)
+            current = {}
+
+        current[key] = val
+
+    if current:
+        blocks.append(current)
+
+    # Filter only AMD GPUs
+    amd_gpus = []
+    for d in blocks:
         vendor = d.get("Device Vendor", "").lower()
-        devtype = d.get("Device Type", "").lower()
-        if "gpu" in devtype and any(kw in vendor for kw in ["amd", "ati", "advanced micro devices", "amd inc"]):
-            valid.append(d)
-    return valid
+        dtype = d.get("Device Type", "").lower()
+        if "gpu" in dtype and any(kw in vendor for kw in ["amd", "ati", "advanced micro devices", "amd inc"]):
+            amd_gpus.append(d)
+
+    return amd_gpus
 
 def check_opencl():
     info("Checking OpenCL runtime …")
