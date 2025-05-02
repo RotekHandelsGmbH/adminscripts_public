@@ -83,21 +83,28 @@ def check_amdgpu() -> bool:
         info("amdgpu not found in lsmod ⇒ probably built-in to kernel (OK).")
     return True
 
-def count_amd_gpus_clinfo(clinfo_out: str) -> int:
-    count = 0
-    v = g = False
-    for raw in clinfo_out.splitlines():
-        line = raw.lstrip()
+def count_amd_gpus_clinfo(clinfo_out: str) -> list[dict]:
+    devices = []
+    device = {}
+    for line in clinfo_out.splitlines():
+        line = line.strip()
         if line.startswith("Device Name"):
-            v = g = False
-        elif line.startswith("Device Vendor") and ("AMD" in line or "Advanced Micro Devices" in line):
-            v = True
-        elif line.startswith("Device Type") and "GPU" in line:
-            g = True
-        elif line.startswith("Max compute units") and v and g:
-            count += 1
-            v = g = False
-    return count
+            if device:
+                devices.append(device)
+                device = {}
+        if ":" in line:
+            key, val = map(str.strip, line.split(":", 1))
+            device[key] = val
+    if device:
+        devices.append(device)
+
+    amd_gpus = []
+    for d in devices:
+        vendor = d.get("Device Vendor", "").lower()
+        dtype = d.get("Device Type", "").lower()
+        if "gpu" in dtype and any(v in vendor for v in ["amd", "advanced micro devices"]):
+            amd_gpus.append(d)
+    return amd_gpus
 
 def check_opencl() -> bool:
     info("Checking OpenCL runtime …")
@@ -126,9 +133,15 @@ def check_opencl() -> bool:
                 platforms.add(name)
     info(f"Found OpenCL platform(s): {', '.join(sorted(platforms)) or 'none'}")
 
-    gpus = count_amd_gpus_clinfo(clinfo_out)
-    if gpus > 0:
-        ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {gpus}")
+    amd_devices = count_amd_gpus_clinfo(clinfo_out)
+    if amd_devices:
+        ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(amd_devices)}")
+        for i, d in enumerate(amd_devices, 1):
+            print(f"\nOpenCL GPU #{i}:")
+            for key in ["Device Name", "Device Vendor", "Max compute units", "Max clock frequency", "Global memory size", "Local memory size", "Device OpenCL C Version"]:
+                if key in d:
+                    print(f"  {key:<25}: {d[key]}")
+
         used_impls = [f.name.lower() for f in icd_files]
         if any("rusticl" in impl for impl in used_impls):
             warn("Rusticl OpenCL detected – limited functionality.")
@@ -153,18 +166,31 @@ def check_vulkan() -> bool:
         print(f"→ {suggest('vulkan-tools mesa-vulkan-drivers')}")
         return False
 
-    summary = run(["vulkaninfo", "--summary"])
-    if summary and "AMD" in summary:
-        driver = next((line.split(":", 1)[1].strip()
-                       for line in summary.splitlines()
-                       if "Driver Name" in line), "unknown")
-        ok(f"AMD GPU detected via Vulkan  [Driver: {driver}]")
-        return True
-
     full_output = run(["vulkaninfo"])
-    if full_output and any("deviceName" in line and "AMD" in line for line in full_output.splitlines()):
-        ok("AMD GPU detected via Vulkan (Fallback through full scan).")
-        return True
+    if full_output:
+        devices = []
+        device = {}
+        for line in full_output.splitlines():
+            line = line.strip()
+            if "VkPhysicalDeviceProperties:" in line:
+                if device:
+                    devices.append(device)
+                    device = {}
+            if "=" in line:
+                key, val = map(str.strip, line.split("=", 1))
+                device[key] = val
+        if device:
+            devices.append(device)
+
+        amd_devices = [d for d in devices if "deviceName" in d and "amd" in d["deviceName"].lower()]
+        if amd_devices:
+            ok(f"AMD GPU(s) detected via Vulkan – Count: {len(amd_devices)}")
+            for i, d in enumerate(amd_devices, 1):
+                print(f"\nVulkan GPU #{i}:")
+                for key in ["deviceName", "driverVersion", "deviceType", "apiVersion"]:
+                    if key in d:
+                        print(f"  {key:<16}: {d[key]}")
+            return True
 
     fail("No AMD GPU device detected through Vulkan ICD.")
     print(f"→ {suggest('mesa-vulkan-drivers')}")
