@@ -63,21 +63,21 @@ def check_amdgpu():
         info("amdgpu not listed – may be built-in to kernel.")
     return True
 
-def parse_clinfo(clinfo_text):
-    devices = []
+def parse_clinfo_blocks(text):
+    blocks = []
     current = {}
-    for line in clinfo_text.splitlines():
+    for line in text.splitlines():
         line = line.strip()
         if not line: continue
         if ":" in line:
-            key, val = [s.strip() for s in line.split(":", 1)]
+            key, val = map(str.strip, line.split(":", 1))
             current[key] = val
         if line.lower().startswith("max compute units"):
             if current.get("Device Type", "").lower() == "gpu" and \
                any(v in current.get("Device Vendor", "").lower() for v in ["amd", "ati", "advanced micro devices", "amd inc"]):
-                devices.append(current.copy())
-                current.clear()
-    return devices
+                blocks.append(current.copy())
+            current.clear()
+    return blocks
 
 def check_opencl():
     info("Checking OpenCL runtime …")
@@ -100,7 +100,7 @@ def check_opencl():
     platforms = [line.split(":")[-1].strip() for line in clinfo_out.splitlines() if "Platform Name" in line]
     info(f"Found OpenCL platform(s): {', '.join(platforms) or 'none'}")
 
-    gpus = parse_clinfo(clinfo_out)
+    gpus = parse_clinfo_blocks(clinfo_out)
     if gpus:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(gpus)}")
         print("\nOpenCL GPU Summary:")
@@ -122,20 +122,19 @@ def check_opencl():
 def parse_vulkan(vulkaninfo_out):
     devices = []
     device = {}
-    capture = False
     for line in vulkaninfo_out.splitlines():
         line = line.strip()
         if "VkPhysicalDeviceProperties:" in line:
             if device: devices.append(device); device = {}
-            capture = True
-        if capture and "=" in line:
-            key, val = map(str.strip, line.split("=", 1))
-            if key in ["deviceName", "driverVersion", "apiVersion", "deviceType"]:
-                device[key] = val
+        if "=" in line:
+            k, v = map(str.strip, line.split("=", 1))
+            if k in ["deviceName", "driverVersion", "apiVersion", "deviceType"]:
+                device[k] = v
         if line.startswith("maxImageDimension2D"):
-            device["max2d"] = f"{line.split('=')[-1].strip()}x{line.split('=')[-1].strip()}"
+            dim = line.split("=")[-1].strip()
+            device["max2d"] = f"{dim}x{dim}"
         if line.startswith("maxComputeSharedMemorySize"):
-            device["shared_mem"] = line.split("=", 1)[-1].strip()
+            device["shared_mem"] = line.split("=")[-1].strip()
     if device: devices.append(device)
     return devices
 
