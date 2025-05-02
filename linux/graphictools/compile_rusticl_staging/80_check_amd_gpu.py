@@ -74,29 +74,30 @@ def check_amdgpu():
     return True
 
 def check_opencl_details(clinfo):
+    lines = clinfo.splitlines()
+    current = {}
     printed = False
-    devices = clinfo.split("\n\n")
-    for dev in devices:
-        if "Device Type" in dev and "GPU" in dev:
-            lines = dev.splitlines()
-            summary = {}
-            for line in lines:
-                if ":" in line:
-                    parts = line.split(":", 1)
-                    if len(parts) == 2:
-                        summary[parts[0].strip()] = parts[1].strip()
-            vendor_string = summary.get("Device Vendor", "").lower()
-            if any(v in vendor_string for v in ["amd", "ati", "advanced micro devices", "amd inc"]):
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if ":" in line:
+            key, val = map(str.strip, line.split(":", 1))
+            current[key] = val
+        if line.startswith("Max compute units"):
+            vendor = current.get("Device Vendor", "").lower()
+            devtype = current.get("Device Type", "").lower()
+            if any(v in vendor for v in ["amd", "ati", "advanced micro devices", "amd inc"]) and "gpu" in devtype:
                 if not printed:
                     print("\nOpenCL GPU Summary:")
                     printed = True
-                print(f"  Name            : {summary.get('Device Name', 'N/A')}")
-                print(f"  Compute Units   : {summary.get('Max compute units', 'N/A')}")
-                print(f"  Clock Frequency : {summary.get('Max clock frequency', 'N/A')} MHz")
-                print(f"  Global Memory   : {int(summary.get('Global memory size', '0')) // (1024 ** 2)} MiB")
-                print(f"  Local Memory    : {int(summary.get('Local memory size', '0')) // 1024} KiB")
-                print(f"  OpenCL C Ver    : {summary.get('Device OpenCL C Version', 'N/A')}")
-                print(f"  Extensions      : {summary.get('Device Extensions', 'N/A')[:80]}...")
+                print(f"  Name            : {current.get('Device Name', 'N/A')}")
+                print(f"  Compute Units   : {current.get('Max compute units', 'N/A')}")
+                print(f"  Clock Frequency : {current.get('Max clock frequency', 'N/A')} MHz")
+                print(f"  Global Memory   : {int(current.get('Global memory size', '0')) // (1024 ** 2)} MiB")
+                print(f"  Local Memory    : {int(current.get('Local memory size', '0')) // 1024} KiB")
+                print(f"  OpenCL C Ver    : {current.get('Device OpenCL C Version', 'N/A')}")
+                current = {}
 
 def check_opencl():
     info("Checking OpenCL runtime …")
@@ -206,7 +207,6 @@ def check_vulkan():
             print(f"  Max 2D Dim      : {gpu.get('max2d', 'N/A')}")
             print(f"  Shared Mem Size : {gpu.get('shared_mem', 'N/A')} bytes")
 
-            # Estimate memory bandwidth from clinfo and lspci
             bus_width_bits = 384
             mem_clock_mhz = 1375
             lspci_data = run(["lspci", "-vv"])
