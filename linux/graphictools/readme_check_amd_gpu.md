@@ -76,14 +76,33 @@ The script will perform all checks and provide detailed, color-coded feedback.
 
 ## Example Output
 
-```bash
+```
+[INFO]  Detecting GPU model …
+✅ GPU Detected: 01:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Tahiti XT [Radeon HD 7970/8970 OEM / R9 280X] [1002:6798]
+
 [INFO]  Checking AMDGPU kernel driver …
 ✅ AMDGPU driver used by 1 GPU(s).
+[INFO]  amdgpu module is loaded.
 [INFO]  Checking OpenCL runtime …
+[INFO]  Found OpenCL ICDs: mesa.icd, rusticl.icd
+[INFO]  Found OpenCL platform(s): rusticl
 ✅ AMD GPU(s) detected as OpenCL device(s) – Count: 1
+[WARN]  Rusticl OpenCL detected – limited functionality.
+→ For full features (e.g., GPGPU, ML, PyOpenCL) use ROCm or AMDGPU-Pro.
 [INFO]  Checking Vulkan stack …
-✅ AMD GPU detected via Vulkan  [Driver: RADV]
-✅ All checks passed – system ready. 🎉
+✅ AMD GPU detected via Vulkan  [Driver: unknown]
+
+[INFO]  Checking for ROCm support …
+[WARN]  ROCm not found.
+→ sudo apt install rocm-opencl-runtime or sudo apt install rocminfo
+
+✅ All main checks passed – system ready. 🎉
+
+[INFO]  For detailed inspection, use:
+   lspci | grep -i vga
+   clinfo
+   vulkaninfo
+   rocminfo
 ```
 
 ---

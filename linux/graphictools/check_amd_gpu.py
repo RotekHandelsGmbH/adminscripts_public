@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-check_amd_gpu.py – Checks AMDGPU Kernel Driver, OpenCL, and Vulkan Support
+check_amd_gpu.py – Checks AMDGPU Kernel Driver, OpenCL, Vulkan, and ROCm Support
 Copyright (c) 2025
 """
-import re
 import shutil
 import subprocess
 import sys
@@ -23,9 +22,7 @@ def info(msg: str):  print(f"{BLUE}[INFO]{NC}  {msg}")
 def warn(msg: str):  print(f"{YELL}[WARN]{NC}  {msg}")
 
 # --------------------------------------------------------------------------- #
-# Helper Routines
 def run(cmd: list[str]) -> str | None:
-    """Runs a command and returns stdout as a string, or None if an error occurs."""
     try:
         return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True)
     except (OSError, subprocess.CalledProcessError):
@@ -41,7 +38,36 @@ def suggest(pkg: str) -> str:
     return f"<use your package manager>: {pkg}"
 
 # --------------------------------------------------------------------------- #
-# 1)  AMDGPU Driver
+def detect_gpu_model() -> None:
+    info("Detecting GPU model …")
+    lspci = run(["lspci", "-nn"])
+    if not lspci:
+        warn("Could not detect GPU model (lspci failed).")
+        return
+
+    gpu_lines = [line for line in lspci.splitlines() if "VGA" in line and ("AMD" in line or "ATI" in line)]
+    if gpu_lines:
+        for line in gpu_lines:
+            ok(f"GPU Detected: {line.strip()}")
+    else:
+        warn("No AMD/ATI GPU found in lspci output.")
+
+# --------------------------------------------------------------------------- #
+def check_rocm() -> bool:
+    info("Checking for ROCm support …")
+    icds = list(Path("/etc/OpenCL/vendors").glob("*.icd"))
+    rocm_icds = [f for f in icds if "rocm" in f.name.lower() or "amd" in f.name.lower()]
+    tools = [cmd for cmd in ("rocminfo", "hipinfo") if command_exists(cmd)]
+
+    if rocm_icds or tools:
+        ok(f"ROCm environment detected. {'Tools: ' + ', '.join(tools) if tools else ''}")
+        return True
+
+    warn("ROCm not found.")
+    print(f"→ {suggest('rocm-opencl-runtime')} or {suggest('rocminfo')}")
+    return False
+
+# --------------------------------------------------------------------------- #
 def check_amdgpu() -> bool:
     info("Checking AMDGPU kernel driver …")
     lspci = run(["lspci", "-k"])
@@ -49,36 +75,29 @@ def check_amdgpu() -> bool:
         fail("lspci not available.")
         return False
 
-    gpu_cnt = len(re.findall(r"Kernel driver in use:\s*amdgpu", lspci, re.I))
+    gpu_cnt = sum("Kernel driver in use: amdgpu" in line for line in lspci.splitlines())
     if gpu_cnt:
         ok(f"AMDGPU driver used by {gpu_cnt} GPU(s).")
     else:
         fail("No GPU is using AMDGPU (maybe using radeon/proprietary?).")
         return False
 
-    if run(["lsmod"]) and re.search(r"^\s*amdgpu", run(["lsmod"]) or "", re.M):
+    lsmod_out = run(["lsmod"]) or ""
+    if any(line.startswith("amdgpu") for line in lsmod_out.splitlines()):
         info("amdgpu module is loaded.")
     else:
         info("amdgpu not found in lsmod ⇒ probably built-in to kernel (OK).")
     return True
 
 # --------------------------------------------------------------------------- #
-# 2)  OpenCL Runtime (clinfo)
 def count_amd_gpus_clinfo(clinfo_out: str) -> int:
-    """
-    Counts device blocks in clinfo output where
-      • Device Vendor = AMD/Advanced Micro Devices  and
-      • Device Type   = GPU
-    occur.
-    """
     count = 0
     v = g = False
     for raw in clinfo_out.splitlines():
         line = raw.lstrip()
         if line.startswith("Device Name"):
             v = g = False
-        elif line.startswith("Device Vendor") and \
-             re.search(r"AMD|Advanced Micro Devices", line, re.I):
+        elif line.startswith("Device Vendor") and ("AMD" in line or "Advanced Micro Devices" in line):
             v = True
         elif line.startswith("Device Type") and "GPU" in line:
             g = True
@@ -105,22 +124,28 @@ def check_opencl() -> bool:
         fail("Failed to execute clinfo.")
         return False
 
-    platforms = re.findall(r"Platform Name\s+:\s+(.*)", clinfo_out)
-    info(f"Found OpenCL platform(s): {', '.join(platforms) or 'none'}")
+    platforms = set()
+    for line in clinfo_out.splitlines():
+        if "Platform Name" in line:
+            parts = line.strip().split(":", 1)
+            name = parts[1].strip() if len(parts) > 1 else parts[0].replace("Platform Name", "").strip()
+            if name:
+                platforms.add(name)
+    info(f"Found OpenCL platform(s): {', '.join(sorted(platforms)) or 'none'}")
 
     gpus = count_amd_gpus_clinfo(clinfo_out)
     if gpus > 0:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {gpus}")
         used_impls = [f.name.lower() for f in icd_files]
         if any("rusticl" in impl for impl in used_impls):
-            warn("Rusticl OpenCL detected – limited functionality (software stack without full GPGPU acceleration).")
+            warn("Rusticl OpenCL detected – limited functionality.")
             print("→ For full features (e.g., GPGPU, ML, PyOpenCL) use ROCm or AMDGPU-Pro.")
         elif any("clover" in impl for impl in used_impls):
-            warn("Clover OpenCL detected – outdated and limited usability.")
+            warn("Clover OpenCL detected – outdated backend.")
             print("→ For full features (e.g., GPGPU, ML, PyOpenCL) use ROCm or AMDGPU-Pro.")
         return True
 
-    if "rusticl" in ''.join(platforms).lower():
+    if any("rusticl" in p.lower() for p in platforms):
         warn("Rusticl platform detected, but no GPU available – possible limitations.")
     else:
         fail("No AMD GPU found in OpenCL device list.")
@@ -129,7 +154,6 @@ def check_opencl() -> bool:
     return False
 
 # --------------------------------------------------------------------------- #
-# 3)  Vulkan Stack
 def check_vulkan() -> bool:
     info("Checking Vulkan stack …")
     if not command_exists("vulkaninfo"):
@@ -138,14 +162,15 @@ def check_vulkan() -> bool:
         return False
 
     summary = run(["vulkaninfo", "--summary"])
-    if summary and re.search(r"GPU id .* AMD", summary):
-        driver = re.search(r"Driver Name\s*:\s*(.*)", summary)
-        ok(f"AMD GPU detected via Vulkan  [Driver: {driver.group(1).strip() if driver else 'unknown'}]")
+    if summary and "AMD" in summary:
+        driver = next((line.split(":", 1)[1].strip()
+                       for line in summary.splitlines()
+                       if "Driver Name" in line), "unknown")
+        ok(f"AMD GPU detected via Vulkan  [Driver: {driver}]")
         return True
 
-    # Fallback: full scan
     full_output = run(["vulkaninfo"])
-    if full_output and re.search(r"deviceName.*AMD", full_output, re.I):
+    if full_output and any("deviceName" in line and "AMD" in line for line in full_output.splitlines()):
         ok("AMD GPU detected via Vulkan (Fallback through full scan).")
         return True
 
@@ -155,17 +180,30 @@ def check_vulkan() -> bool:
 
 # --------------------------------------------------------------------------- #
 def main() -> None:
+    detect_gpu_model()
+    print()
     success = all((
         check_amdgpu(),
         check_opencl(),
         check_vulkan(),
     ))
     print()
+    check_rocm()
+    print()
+
     if success:
-        ok("All checks passed – system ready. 🎉")
-        sys.exit(0)
-    fail("At least one check failed – see above.")
-    sys.exit(1)
+        ok("All main checks passed – system ready. 🎉")
+    else:
+        fail("At least one check failed – see above.")
+
+    print()
+    info("For detailed inspection, use:")
+    print("   lspci | grep -i vga")
+    print("   clinfo")
+    print("   vulkaninfo")
+    print("   rocminfo")
+
+    sys.exit(0 if success else 1)
 
 # --------------------------------------------------------------------------- #
 if __name__ == "__main__":
