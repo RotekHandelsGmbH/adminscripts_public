@@ -121,9 +121,12 @@ def check_opencl():
 
     platforms = set()
     for line in clinfo_out.splitlines():
-        if "Platform Name" in line:
-            _, val = line.split(":", 1)
-            platforms.add(val.strip())
+        if "Platform Name" in line and ":" in line:
+            try:
+                _, val = map(str.strip, line.split(":", 1))
+                platforms.add(val)
+            except ValueError:
+                continue
     info(f"Found OpenCL platform(s): {', '.join(platforms) or 'none'}")
 
     gpus = parse_clinfo_blocks(clinfo_out)
