@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+import re
 
 # --------------------------------------------------------------------------- #
 # ANSI Colors + Emojis
@@ -159,6 +160,19 @@ def check_opencl() -> bool:
     platforms = parse_opencl_platforms(clinfo_out)
     info(f"Found OpenCL platform(s): {', '.join(platforms) or 'none'}")
 
+    devices = clinfo_out.split("\n\n")
+    for dev in devices:
+        if "Device Type" in dev and "GPU" in dev:
+            lines = dev.splitlines()
+            summary = {line.split(":", 1)[0].strip(): line.split(":", 1)[1].strip() for line in lines if ":" in line}
+            if "Device Vendor" in summary and "AMD" in summary["Device Vendor"]:
+                print("\nOpenCL GPU Summary:")
+                print(f"  Name            : {summary.get('Device Name')}")
+                print(f"  Compute Units   : {summary.get('Max compute units')}")
+                print(f"  Clock Frequency : {summary.get('Max clock frequency')} MHz")
+                print(f"  Global Memory   : {int(summary.get('Global memory size', '0')) // (1024 ** 2)} MiB")
+                print(f"  OpenCL C Ver    : {summary.get('Device OpenCL C Version')}")
+
     gpu_count = count_amd_gpus_clinfo(clinfo_out)
     if gpu_count > 0:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {gpu_count}")
@@ -188,6 +202,12 @@ def detect_amd_gpu_vulkan_full() -> tuple[int, list[dict]]:
             current["driver"] = line.split("=", 1)[1].strip()
         elif line.startswith("deviceUUID") and current:
             current["uuid"] = line.split("=", 1)[1].strip()
+        elif line.startswith("deviceType") and current:
+            current["type"] = line.split("=", 1)[1].strip()
+        elif line.startswith("apiVersion") and current:
+            current["api"] = line.split("=", 1)[1].strip()
+        elif line.startswith("maxImageDimension2D") and current:
+            current["max2d"] = line.split("=", 1)[1].strip()
             gpus.append(current)
             current = {}
     return len(gpus), gpus
@@ -211,7 +231,13 @@ def check_vulkan() -> bool:
     if gpu_count > 0:
         ok(f"AMD GPU(s) detected via Vulkan – Count: {gpu_count}")
         for dev in devices:
-            info(f"Vulkan GPU: {dev.get('name')} | Driver: {dev.get('driver')} | UUID: {dev.get('uuid')}")
+            print("\nVulkan GPU Summary:")
+            print(f"  Name            : {dev.get('name')}")
+            print(f"  Driver Version  : {dev.get('driver')}")
+            print(f"  UUID            : {dev.get('uuid')}")
+            print(f"  Type            : {dev.get('type')}")
+            print(f"  API Version     : {dev.get('api')}")
+            print(f"  Max 2D Dim      : {dev.get('max2d')}")
         if driver != "unknown":
             info(f"Driver (from summary): {driver}")
         return True
