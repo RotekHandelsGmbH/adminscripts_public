@@ -124,15 +124,15 @@ def check_opencl() -> bool:
         fail("Failed to execute clinfo.")
         return False
 
-    # 🛠 Fixed platform detection logic
-    platforms = []
+    # ✅ Deduplicated platform detection
+    platforms = set()
     for line in clinfo_out.splitlines():
         if "Platform Name" in line:
             parts = line.strip().split(":", 1)
             name = parts[1].strip() if len(parts) > 1 else parts[0].replace("Platform Name", "").strip()
             if name:
-                platforms.append(name)
-    info(f"Found OpenCL platform(s): {', '.join(platforms) or 'none'}")
+                platforms.add(name)
+    info(f"Found OpenCL platform(s): {', '.join(sorted(platforms)) or 'none'}")
 
     gpus = count_amd_gpus_clinfo(clinfo_out)
     if gpus > 0:
