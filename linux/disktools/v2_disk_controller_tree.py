@@ -33,7 +33,7 @@ def check_root():
 
 def check_dependencies():
     print(f"{BLUE}🔍 Checking dependencies...{NC}")
-    required = ['smartctl', 'nvme', 'lspci']
+    required = ['smartctl', 'nvme', 'lspci', 'lsblk']
     for tool in required:
         if not shutil.which(tool):
             print(f"{YELLOW}Missing required tool: {tool}{NC}")
@@ -94,9 +94,11 @@ def format_smart_health(passed):
 def get_temperature_from_attributes(attr_table):
     for attr in attr_table:
         if attr["id"] in [194, 190]:
-            raw = attr.get("raw", {}).get("value")
-            if isinstance(raw, int):
-                return f"🌡️ {raw}°C,"
+            raw = attr.get("raw", {})
+            if "string" in raw and raw["string"].isdigit():
+                return f"🌡️ {raw['string']}°C,"
+            if isinstance(raw.get("value"), int) and 0 <= raw["value"] <= 150:
+                return f"🌡️ {raw['value']}°C,"
     return "🌡️ N/A,"
 
 def get_sata_speed_label(speed_str):
@@ -109,23 +111,34 @@ def get_sata_speed_label(speed_str):
     return "SATA"
 
 def color_link_speed(link):
-    if re.search(r'(SATA6)', link):
+    if "SATA6" in link:
         return f"{BOLD_GREEN}🧩 link={link}{NC}"
-    elif re.search(r'(SATA3)', link):
+    elif "SATA3" in link:
         return f"{GREEN}🧩 link={link}{NC}"
-    elif re.search(r'(SATA1)', link):
+    elif "SATA1" in link:
         return f"{YELLOW}🧩 link={link}{NC}"
     return f"🧩 link={link}"
+
+def compact_model_name(vendor: str, model: str) -> str:
+    """Removes duplicated vendor/model_family prefixes from model."""
+    if vendor and model.startswith(vendor):
+        return model
+    if vendor and vendor in model:
+        cleaned = model.replace(vendor, "").strip(" -")
+        return cleaned if cleaned else model
+    return model
 
 # ── SATA Disk Handler (JSON-based) ──────────────────
 
 def process_sata_disks():
     print(f"{BLUE}🧮 Scanning SATA disks...{NC}")
-    for dev in os.listdir("/sys/block"):
-        if not dev.startswith("sd"):
+    lines = run("lsblk -dn -o NAME,TYPE").splitlines()
+    for line in lines:
+        name, dtype = line.strip().split()
+        if dtype != "disk":
             continue
-        device = f"/dev/{dev}"
-        devpath = f"/sys/block/{dev}/device"
+        device = f"/dev/{name}"
+        devpath = f"/sys/block/{name}/device"
         controller = get_storage_controller(devpath)
 
         smart_json_raw = run(f"smartctl -j -a {device}")
@@ -137,25 +150,23 @@ def process_sata_disks():
         except json.JSONDecodeError:
             continue
 
-        model = data.get("model_name", "unknown")
-        vendor = data.get("model_family", "unknown")
+        vendor = data.get("model_family", "").strip()
+        model_raw = data.get("model_name", "unknown").strip()
+        model = compact_model_name(vendor, model_raw)
         serial = data.get("serial_number", "unknown")
         firmware = data.get("firmware_version", "unknown")
         size_bytes = data.get("user_capacity", {}).get("bytes", 0)
         size = format_bytes(size_bytes)
-
         smart_passed = data.get("smart_status", {}).get("passed")
         smart_health = format_smart_health(smart_passed)
-
         attributes = data.get("ata_smart_attributes", {}).get("table", [])
         temperature = get_temperature_from_attributes(attributes)
-
         speed_str = data.get("interface_speed", {}).get("max", {}).get("string", "")
         protocol = get_sata_speed_label(speed_str)
         link_display = color_link_speed(protocol)
 
         CONTROLLER_DISKS[controller].append(
-            f"{GREEN}💾 {device}{NC}  ({vendor} {model}, {size}, {protocol}, "
+            f"{GREEN}💾 {device}{NC}  ({model}, {size}, {protocol}, "
             f"{link_display}, {smart_health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
         )
 
@@ -176,6 +187,6 @@ if __name__ == "__main__":
     check_root()
     print_header()
     check_dependencies()
-    process_sata_disks()  # JSON-based SATA parsing
-    # process_nvme_disks()  ← still needs JSON support!
+    process_sata_disks()
+    # NVMe support pending JSON integration
     print_output()
