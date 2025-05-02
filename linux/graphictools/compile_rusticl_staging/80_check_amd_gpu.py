@@ -65,19 +65,29 @@ def check_amdgpu():
 
 def parse_clinfo_blocks(text):
     blocks = []
-    current = {}
+    current_block = []
     for line in text.splitlines():
-        line = line.strip()
-        if not line: continue
-        if ":" in line:
-            key, val = map(str.strip, line.split(":", 1))
-            current[key] = val
-        if line.lower().startswith("max compute units"):
-            if current.get("Device Type", "").lower() == "gpu" and \
-               any(v in current.get("Device Vendor", "").lower() for v in ["amd", "ati", "advanced micro devices", "amd inc"]):
-                blocks.append(current.copy())
-            current.clear()
-    return blocks
+        if line.strip().lower().startswith("device name"):
+            if current_block:
+                blocks.append(current_block)
+                current_block = []
+        if line.strip():
+            current_block.append(line.strip())
+    if current_block:
+        blocks.append(current_block)
+
+    valid = []
+    for block in blocks:
+        d = {}
+        for line in block:
+            if ":" in line:
+                k, v = map(str.strip, line.split(":", 1))
+                d[k] = v
+        vendor = d.get("Device Vendor", "").lower()
+        devtype = d.get("Device Type", "").lower()
+        if "gpu" in devtype and any(kw in vendor for kw in ["amd", "ati", "advanced micro devices", "amd inc"]):
+            valid.append(d)
+    return valid
 
 def check_opencl():
     info("Checking OpenCL runtime …")
