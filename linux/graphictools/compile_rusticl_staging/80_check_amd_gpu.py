@@ -7,41 +7,64 @@ import subprocess
 import sys
 from pathlib import Path
 
-# --------------------------------------------------------------------------- #
-# ANSI Colors + Emojis
 GREEN = "\033[1;32m"
 RED   = "\033[1;31m"
 BLUE  = "\033[1;34m"
 YELL  = "\033[1;33m"
 NC    = "\033[0m"
 
-def ok(msg: str):    print(f"{GREEN}✅ {msg}{NC}")
-def fail(msg: str):  print(f"{RED}❌ {msg}{NC}")
-def info(msg: str):  print(f"{BLUE}[INFO]{NC}  {msg}")
-def warn(msg: str):  print(f"{YELL}[WARN]{NC}  {msg}")
+def ok(msg):   print(f"{GREEN}✅ {msg}{NC}")
+def fail(msg): print(f"{RED}❌ {msg}{NC}")
+def info(msg): print(f"{BLUE}[INFO]{NC}  {msg}")
+def warn(msg): print(f"{YELL}[WARN]{NC}  {msg}")
 
-# --------------------------------------------------------------------------- #
-def run(cmd: list[str]) -> str | None:
+def run(cmd):
     try:
         return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True)
-    except (OSError, subprocess.CalledProcessError):
+    except Exception:
         return None
 
-def command_exists(cmd: str) -> bool:
+def command_exists(cmd):
     return shutil.which(cmd) is not None
 
-def suggest(pkg: str) -> str:
-    if   command_exists("apt"):    return f"sudo apt install {pkg}"
-    elif command_exists("dnf"):    return f"sudo dnf install {pkg}"
-    elif command_exists("pacman"): return f"sudo pacman -S {pkg}"
+def suggest(pkg):
+    if command_exists("apt"): return f"sudo apt install {pkg}"
+    if command_exists("dnf"): return f"sudo dnf install {pkg}"
+    if command_exists("pacman"): return f"sudo pacman -S {pkg}"
     return f"<use your package manager>: {pkg}"
 
-# --------------------------------------------------------------------------- #
-def check_opencl_details() -> None:
-    clinfo = run(["clinfo"])
-    if not clinfo:
+def detect_gpu_model():
+    info("Detecting GPU model …")
+    lspci = run(["lspci", "-nn"])
+    if not lspci:
+        warn("Could not detect GPU model (lspci failed).")
         return
+    for line in lspci.splitlines():
+        if "VGA" in line and ("AMD" in line or "ATI" in line):
+            ok(f"GPU Detected: {line.strip()}")
 
+def check_amdgpu():
+    info("Checking AMDGPU kernel driver …")
+    lspci = run(["lspci", "-k"])
+    if not lspci:
+        fail("lspci not available.")
+        return False
+
+    count = sum("Kernel driver in use: amdgpu" in line for line in lspci.splitlines())
+    if count:
+        ok(f"AMDGPU driver used by {count} GPU(s).")
+    else:
+        fail("No GPU is using AMDGPU (maybe using radeon/proprietary?).")
+        return False
+
+    lsmod = run(["lsmod"]) or ""
+    if any(line.startswith("amdgpu") for line in lsmod.splitlines()):
+        info("amdgpu module is loaded.")
+    else:
+        info("amdgpu not found in lsmod ⇒ probably built-in to kernel (OK).")
+    return True
+
+def check_opencl_details(clinfo):
     devices = clinfo.split("\n\n")
     for dev in devices:
         if "Device Type" in dev and "GPU" in dev:
@@ -62,38 +85,7 @@ def check_opencl_details() -> None:
                 print(f"  OpenCL C Ver    : {summary.get('Device OpenCL C Version', 'N/A')}")
                 print(f"  Extensions      : {summary.get('Device Extensions', 'N/A')[:80]}...")
 
-# --------------------------------------------------------------------------- #
-def detect_amd_gpu_vulkan_full() -> tuple[int, list[dict]]:
-    output = run(["vulkaninfo"])
-    if not output:
-        return 0, []
-
-    gpus = []
-    current = {}
-    for line in output.splitlines():
-        line = line.strip()
-
-        if line.startswith("deviceName") and "AMD" in line:
-            if current:
-                gpus.append(current)
-                current = {}
-            parts = line.split("=", 1)
-            if len(parts) == 2:
-                current["name"] = parts[1].strip()
-
-        elif any(line.startswith(prefix) for prefix in ("driverVersion", "deviceUUID", "deviceType", "apiVersion", "maxImageDimension2D")):
-            key = line.split("=")[0].strip()
-            parts = line.split("=", 1)
-            if len(parts) == 2:
-                current[key.lower()] = parts[1].strip()
-
-    if current:
-        gpus.append(current)
-
-    return len(gpus), gpus
-
-# --------------------------------------------------------------------------- #
-def check_opencl() -> bool:
+def check_opencl():
     info("Checking OpenCL runtime …")
     if not command_exists("clinfo"):
         fail("clinfo is missing.")
@@ -107,56 +99,117 @@ def check_opencl() -> bool:
         warn("No OpenCL ICD files found!")
 
     clinfo_out = run(["clinfo"])
-    if clinfo_out is None:
+    if not clinfo_out:
         fail("Failed to execute clinfo.")
         return False
 
-    platforms = set()
+    platforms = []
     for line in clinfo_out.splitlines():
         if "Platform Name" in line:
-            parts = line.strip().split(":", 1)
+            parts = line.split(":", 1)
             if len(parts) == 2:
-                platforms.add(parts[1].strip())
+                platforms.append(parts[1].strip())
+    info(f"Found OpenCL platform(s): {', '.join(sorted(set(platforms))) or 'none'}")
 
-    info(f"Found OpenCL platform(s): {', '.join(sorted(platforms)) or 'none'}")
-    check_opencl_details()
+    check_opencl_details(clinfo_out)
 
-    gpu_count = sum(1 for block in clinfo_out.split("\n\n") if "Device Vendor" in block and "AMD" in block and "Device Type" in block and "GPU" in block)
+    gpu_count = sum(1 for block in clinfo_out.split("\n\n")
+                    if "Device Vendor" in block and "AMD" in block and "Device Type" in block and "GPU" in block)
     if gpu_count > 0:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {gpu_count}")
+        if any("rusticl" in icd.lower() for icd in icds):
+            warn("Rusticl OpenCL detected – limited functionality.")
+            print("→ For full features (e.g., GPGPU, ML, PyOpenCL) use ROCm or AMDGPU-Pro.")
         return True
 
     fail("No AMD GPU found in OpenCL device list.")
     return False
 
-# --------------------------------------------------------------------------- #
-def main():
-    info("Detecting GPU model …")
-    lspci = run(["lspci", "-nn"])
-    if lspci:
-        for line in lspci.splitlines():
-            if "VGA" in line and ("AMD" in line or "ATI" in line):
-                ok(f"GPU Detected: {line.strip()}")
-                break
+def detect_amd_gpu_vulkan_full():
+    output = run(["vulkaninfo"])
+    if not output:
+        return 0, []
 
-    print()
-    if not check_opencl():
-        sys.exit(1)
+    gpus = []
+    current = {}
+    for line in output.splitlines():
+        line = line.strip()
 
-    print()
+        if line.startswith("deviceName") and "AMD" in line:
+            if current:
+                gpus.append(current)
+                current = {}
+            if "=" in line:
+                current["name"] = line.split("=", 1)[1].strip()
+
+        elif line.startswith("driverVersion"):
+            if "=" in line:
+                current["driver"] = line.split("=", 1)[1].strip()
+
+        elif line.startswith("deviceUUID"):
+            if "=" in line:
+                current["uuid"] = line.split("=", 1)[1].strip()
+
+        elif line.startswith("deviceType"):
+            if "=" in line:
+                current["type"] = line.split("=", 1)[1].strip()
+
+        elif line.startswith("apiVersion"):
+            if "=" in line:
+                current["api"] = line.split("=", 1)[1].strip()
+
+        elif line.startswith("maxImageDimension2D"):
+            if "=" in line:
+                current["max2d"] = line.split("=", 1)[1].strip()
+
+    if current:
+        gpus.append(current)
+
+    return len(gpus), gpus
+
+def check_vulkan():
+    info("Checking Vulkan stack …")
+    if not command_exists("vulkaninfo"):
+        fail("vulkaninfo is missing.")
+        print(f"→ {suggest('vulkan-tools mesa-vulkan-drivers')}")
+        return False
+
     count, gpus = detect_amd_gpu_vulkan_full()
     if count > 0:
         ok(f"AMD GPU(s) detected via Vulkan – Count: {count}")
         for gpu in gpus:
             print("\nVulkan GPU Summary:")
             print(f"  Name            : {gpu.get('name', 'N/A')}")
-            print(f"  Driver Version  : {gpu.get('driverversion', 'N/A')}")
-            print(f"  UUID            : {gpu.get('deviceuuid', 'N/A')}")
-            print(f"  Type            : {gpu.get('devicetype', 'N/A')}")
-            print(f"  API Version     : {gpu.get('apiversion', 'N/A')}")
-            print(f"  Max 2D Dim      : {gpu.get('maximagedimension2d', 'N/A')}")
+            print(f"  Driver Version  : {gpu.get('driver', 'N/A')}")
+            print(f"  UUID            : {gpu.get('uuid', 'N/A')}")
+            print(f"  Type            : {gpu.get('type', 'N/A')}")
+            print(f"  API Version     : {gpu.get('api', 'N/A')}")
+            print(f"  Max 2D Dim      : {gpu.get('max2d', 'N/A')}")
+        return True
+
+    fail("No AMD GPU detected via Vulkan.")
+    return False
+
+def main():
+    detect_gpu_model()
+    print()
+    success = all([
+        check_amdgpu(),
+        check_opencl(),
+        check_vulkan()
+    ])
+    print()
+    if success:
+        ok("All main checks passed – system ready. 🎉")
     else:
-        fail("No AMD GPU detected via Vulkan.")
+        fail("At least one check failed – see above.")
+    print()
+    info("For detailed inspection, use:")
+    print("   lspci | grep -i vga")
+    print("   clinfo")
+    print("   vulkaninfo")
+    print("   rocminfo")
+    sys.exit(0 if success else 1)
 
 if __name__ == "__main__":
     main()
