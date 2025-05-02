@@ -133,41 +133,42 @@ def detect_amd_gpu_vulkan_full():
 
     gpus = []
     current = {}
+    in_gpu_section = False
+
     for line in output.splitlines():
         line = line.strip()
 
-        if line.startswith("deviceName") and "AMD" in line:
+        if line.startswith("VkPhysicalDeviceProperties:"):
             if current:
                 gpus.append(current)
                 current = {}
-            parts = line.split("=", 1)
-            if len(parts) == 2:
-                current["name"] = parts[1].strip()
+            in_gpu_section = True
+            continue
 
-        elif line.startswith("driverVersion"):
-            parts = line.split("=", 1)
-            if len(parts) == 2:
-                current["driver"] = parts[1].strip()
+        if in_gpu_section:
+            if line.startswith("deviceName") and "AMD" in line:
+                current["name"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
 
-        elif line.startswith("deviceUUID"):
-            parts = line.split("=", 1)
-            if len(parts) == 2:
-                current["uuid"] = parts[1].strip()
+            elif line.startswith("driverVersion"):
+                current["driver"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
 
-        elif line.startswith("deviceType"):
-            parts = line.split("=", 1)
-            if len(parts) == 2:
-                current["type"] = parts[1].strip()
+            elif line.startswith("deviceUUID"):
+                current["uuid"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
 
-        elif line.startswith("apiVersion"):
-            parts = line.split("=", 1)
-            if len(parts) == 2:
-                current["api"] = parts[1].strip()
+            elif line.startswith("deviceType"):
+                current["type"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
 
-        elif line.startswith("maxImageDimension2D"):
-            parts = line.split("=", 1)
-            if len(parts) == 2:
-                current["max2d"] = parts[1].strip()
+            elif line.startswith("apiVersion"):
+                current["api"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
+
+            elif line.startswith("maxImageDimension2D"):
+                current["max2d"] = line.split("=", 1)[-1].strip() if "=" in line else line.split(":", 1)[-1].strip()
+
+            elif line == "":
+                if current:
+                    gpus.append(current)
+                    current = {}
+                in_gpu_section = False
 
     if current:
         gpus.append(current)
