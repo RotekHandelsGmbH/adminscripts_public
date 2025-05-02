@@ -137,10 +137,10 @@ def check_opencl() -> bool:
     if amd_devices:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(amd_devices)}")
         for i, d in enumerate(amd_devices, 1):
-            print(f"\nOpenCL GPU #{i}:")
-            for key in ["Device Name", "Device Vendor", "Max compute units", "Max clock frequency", "Global memory size", "Local memory size", "Device OpenCL C Version"]:
-                if key in d:
-                    print(f"  {key:<25}: {d[key]}")
+            print(f"
+OpenCL GPU #{i}:")
+            for key, value in d.items():
+                print(f"  {key:<25}: {value}")
 
         used_impls = [f.name.lower() for f in icd_files]
         if any("rusticl" in impl for impl in used_impls):
@@ -184,13 +184,21 @@ def check_vulkan() -> bool:
 
         amd_devices = [d for d in devices if "deviceName" in d and "amd" in d["deviceName"].lower()]
         if amd_devices:
-            ok(f"AMD GPU(s) detected via Vulkan – Count: {len(amd_devices)}")
-            for i, d in enumerate(amd_devices, 1):
-                print(f"\nVulkan GPU #{i}:")
-                for key in ["deviceName", "driverVersion", "deviceType", "apiVersion"]:
-                    if key in d:
-                        print(f"  {key:<16}: {d[key]}")
-            return True
+        ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(amd_devices)}")
+        for i, d in enumerate(amd_devices, 1):
+            print(f"
+OpenCL GPU #{i}:")
+            for key, value in d.items():
+                print(f"  {key:<25}: {value}")
+
+        used_impls = [f.name.lower() for f in icd_files]
+        if any("rusticl" in impl for impl in used_impls):
+            warn("Rusticl OpenCL detected – limited functionality.")
+            print("→ For full features (e.g., GPGPU, ML, PyOpenCL) use ROCm or AMDGPU-Pro.")
+        elif any("clover" in impl for impl in used_impls):
+            warn("Clover OpenCL detected – outdated backend.")
+            print("→ For full features (e.g., GPGPU, ML, PyOpenCL) use ROCm or AMDGPU-Pro.")
+        return True
 
     fail("No AMD GPU device detected through Vulkan ICD.")
     print(f"→ {suggest('mesa-vulkan-drivers')}")
