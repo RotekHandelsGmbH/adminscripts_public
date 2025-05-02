@@ -2,11 +2,13 @@
 """
 check_amd_gpu.py – Checks AMDGPU Kernel Driver, OpenCL, Vulkan, and ROCm Support
 """
+
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+# ANSI Colors
 GREEN = "\033[1;32m"
 RED   = "\033[1;31m"
 BLUE  = "\033[1;34m"
@@ -83,7 +85,7 @@ def check_opencl_details(clinfo):
                     parts = line.split(":", 1)
                     if len(parts) == 2:
                         summary[parts[0].strip()] = parts[1].strip()
-            if summary.get("Device Vendor", "").lower().startswith("amd"):
+            if "amd" in summary.get("Device Vendor", "").lower():
                 if not printed:
                     print("\nOpenCL GPU Summary:")
                     printed = True
