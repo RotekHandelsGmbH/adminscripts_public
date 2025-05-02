@@ -42,6 +42,14 @@ def detect_gpu_model():
     for line in lspci.splitlines():
         if "VGA" in line and ("AMD" in line or "ATI" in line):
             ok(f"GPU Detected: {line.strip()}")
+            # Extract PCIe info
+            pcie_info = run(["lspci", "-vv", "-s", line.split()[0]])
+            if pcie_info:
+                for l in pcie_info.splitlines():
+                    if "LnkCap:" in l and "Speed" in l:
+                        print(f"  PCIe Capability : {l.strip()}")
+                    if "LnkSta:" in l and "Speed" in l:
+                        print(f"  PCIe Status     : {l.strip()}")
 
 def check_amdgpu():
     info("Checking AMDGPU kernel driver …")
@@ -198,6 +206,32 @@ def check_vulkan():
             print(f"  Max 2D Dim      : {gpu.get('max2d', 'N/A')}")
             print(f"  Compute Units   : {gpu.get('compute_units', 'N/A')}")
             print(f"  Shared Mem Size : {gpu.get('shared_mem', 'N/A')} bytes")
+
+            # Attempt to parse bus width and clock dynamically from clinfo or lspci
+            bus_width_bits = 384
+            mem_clock_mhz = 1375
+            lspci_data = run(["lspci", "-vv"])
+            if lspci_data:
+                for line in lspci_data.splitlines():
+                    if "Width" in line and "bits" in line:
+                        try:
+                            bus_width_bits = int([s for s in line.split() if s.isdigit()][0])
+                        except: pass
+            clinfo_data = run(["clinfo"])
+            if clinfo_data:
+                for line in clinfo_data.splitlines():
+                    if "Max clock frequency" in line:
+                        try:
+                            mem_clock_mhz = int(line.split()[-2])
+                        except: pass
+
+            bandwidth_bytes = (bus_width_bits / 8) * 2 * mem_clock_mhz * 1e6
+            print(f"  Bus Width       : {bus_width_bits} bits")
+            print(f"  Mem Clock       : {mem_clock_mhz} MHz")
+            if bus_width_bits < 64 or mem_clock_mhz < 100:
+                warn("⚠️  Detected values may be defaults or invalid. Consider verifying manually.")
+            print(f"  Est. Bandwidth  : {bandwidth_bytes / 1e9:.1f} GB/s")
+            print("  Bandwidth Note  : Use tools like 'glmark2', 'rocm_bandwidth_test', or 'lspci -vv'")
         return True
 
     fail("No AMD GPU detected via Vulkan.")
