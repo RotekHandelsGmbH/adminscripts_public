@@ -87,7 +87,9 @@ def parse_clinfo_blocks(text):
     for d in blocks:
         vendor = d.get("Device Vendor", "").lower()
         dtype = d.get("Device Type", "").lower()
-        if "gpu" in dtype and any(kw in vendor for kw in ["amd", "ati", "advanced micro devices", "amd inc"]):
+        if "gpu" in dtype and any(kw in vendor for kw in [
+            "amd", "ati", "advanced micro devices", "amd inc", "mesa/x.org"
+        ]):
             amd_gpus.append(d)
 
     return amd_gpus
@@ -121,11 +123,14 @@ def check_opencl():
             print(f"  Name            : {d.get('Device Name', 'N/A')}")
             print(f"  Compute Units   : {d.get('Max compute units', 'N/A')}")
             print(f"  Clock Frequency : {d.get('Max clock frequency', 'N/A')} MHz")
-            print(f"  Global Memory   : {int(d.get('Global memory size', '0')) // (1024**2)} MiB")
-            print(f"  Local Memory    : {int(d.get('Local memory size', '0')) // 1024} KiB")
+            try:
+                print(f"  Global Memory   : {int(d.get('Global memory size', '0')) // (1024**2)} MiB")
+                print(f"  Local Memory    : {int(d.get('Local memory size', '0')) // 1024} KiB")
+            except ValueError:
+                print("  Memory Info     : Unavailable (parse error)")
             print(f"  OpenCL C Ver    : {d.get('Device OpenCL C Version', 'N/A')}")
         if any("rusticl" in f.name.lower() for f in icds):
-            warn("Rusticl OpenCL detected – limited functionality.")
+            warn("Rusticl OpenCL detected – may have limited functionality.")
             print("→ For full features (e.g., GPGPU, ML, PyOpenCL) use ROCm or AMDGPU-Pro.")
         return True
 
