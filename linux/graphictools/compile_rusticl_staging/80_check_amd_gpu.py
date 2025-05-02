@@ -110,9 +110,6 @@ def summarize_opencl(d):
     print(f"  Max Work Item Sizes         : {d.get('Max work item sizes')}")
     print(f"  OpenCL C Version            : {d.get('Device OpenCL C Version')}")
     print(f"  IL Version                  : {d.get('IL version')}")
-    extensions = [k for k in d.keys() if k.startswith("cl_khr") or k.startswith("cles_khr")]
-    if extensions:
-        print(f"  Key Extensions              : {', '.join(extensions)}")
 
 def check_opencl():
     info("Checking OpenCL runtime …")
@@ -142,26 +139,42 @@ def check_opencl():
 
 def parse_vulkan_devices(text):
     devices = []
-    device = {}
-    total_mem = 0
+    current_device = {}
+    mem_heaps = []
+    in_heap = False
+
     for line in text.splitlines():
         line = line.strip()
+
         if "VkPhysicalDeviceProperties:" in line:
-            if device:
-                devices.append(device)
-                device = {}
+            if current_device:
+                devices.append(current_device)
+                current_device = {}
+            mem_heaps = []
+
         if "=" in line:
             key, val = map(str.strip, line.split("=", 1))
-            if key in ["deviceName", "driverVersion", "apiVersion", "deviceType", "maxComputeWorkGroupInvocations", "maxComputeSharedMemorySize"]:
-                device[key] = val
+            if key in [
+                "deviceName", "driverVersion", "apiVersion", "deviceType",
+                "maxComputeWorkGroupInvocations", "maxComputeSharedMemorySize"
+            ]:
+                current_device[key] = val
+
         if "heapFlags = DEVICE_LOCAL_BIT" in line:
-            m = re.search(r"size = (\d+)", line)
-            if m:
-                total_mem += int(m.group(1))
-    if device:
-        if total_mem:
-            device["Total Device Local Memory"] = f"{total_mem // 1024 ** 2} MiB"
-        devices.append(device)
+            in_heap = True
+        elif in_heap and "size =" in line:
+            match = re.search(r"size = (\d+)", line)
+            if match:
+                mem_heaps.append(int(match.group(1)))
+            in_heap = False
+
+    if current_device:
+        if mem_heaps:
+            current_device["Total Device Local Memory"] = f"{sum(mem_heaps) // 1024**2} MiB"
+        else:
+            current_device["Total Device Local Memory"] = "N/A"
+        devices.append(current_device)
+
     return [d for d in devices if "deviceName" in d and "amd" in d["deviceName"].lower()]
 
 def summarize_vulkan(d):
@@ -170,9 +183,9 @@ def summarize_vulkan(d):
     print(f"  Driver Version              : {d.get('driverVersion')}")
     print(f"  Device Type                 : {d.get('deviceType')}")
     print(f"  Vulkan API Version          : {d.get('apiVersion')}")
-    print(f"  Local Device Memory         : {d.get('Total Device Local Memory', 'N/A')}")
-    print(f"  maxComputeWorkGroupInvocations : {d.get('maxComputeWorkGroupInvocations', 'N/A')}")
-    print(f"  maxComputeSharedMemorySize     : {d.get('maxComputeSharedMemorySize', 'N/A')}")
+    print(f"  Local Device Memory         : {d.get('Total Device Local Memory')}")
+    print(f"  maxComputeWorkGroupInvocations : {d.get('maxComputeWorkGroupInvocations')}")
+    print(f"  maxComputeSharedMemorySize     : {d.get('maxComputeSharedMemorySize')}")
 
 def check_vulkan():
     info("Checking Vulkan stack …")
