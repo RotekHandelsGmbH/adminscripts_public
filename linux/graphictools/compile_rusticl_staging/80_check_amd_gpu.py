@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_amd_gpu.py – Detects AMDGPU Kernel Driver, OpenCL, Vulkan, and ROCm Support
+check_amd_gpu.py – Detects AMDGPU Kernel Driver, OpenCL (Rusticl/ROCm), Vulkan, and provides summaries.
 """
 
 import subprocess
@@ -15,10 +15,10 @@ BLUE  = "\033[1;34m"
 YELL  = "\033[1;33m"
 NC    = "\033[0m"
 
-def ok(msg): print(f"{GREEN}✅ {msg}{NC}")
-def fail(msg): print(f"{RED}❌ {msg}{NC}")
-def info(msg): print(f"{BLUE}[INFO]{NC}  {msg}")
-def warn(msg): print(f"{YELL}[WARN]{NC}  {msg}")
+def ok(msg):    print(f"{GREEN}✅ {msg}{NC}")
+def fail(msg):  print(f"{RED}❌ {msg}{NC}")
+def info(msg):  print(f"{BLUE}[INFO]{NC}  {msg}")
+def warn(msg):  print(f"{YELL}[WARN]{NC}  {msg}")
 
 def run(cmd):
     try:
@@ -56,28 +56,47 @@ def check_amdgpu():
         info("amdgpu not listed – may be built-in to kernel.")
     return True
 
-def parse_opencl_devices(clinfo_out):
+def parse_opencl_devices(text):
+    platforms = set()
     devices = []
-    device = {}
-    capture = False
-    for line in clinfo_out.splitlines():
-        line = line.strip()
-        if line.startswith("Device Name"):
-            if device:
-                devices.append(device)
-                device = {}
-            capture = True
-        if capture and ":" in line:
-            key, val = map(str.strip, line.split(":", 1))
-            device[key] = val
-    if device:
-        devices.append(device)
+    current_device = {}
+    in_device = False
 
-    return [
-        d for d in devices
-        if "Device Vendor" in d and re.search(r"amd|advanced micro devices", d["Device Vendor"], re.I)
-        and d.get("Device Type", "").lower() == "gpu"
-    ]
+    for line in text.splitlines():
+        line = line.strip()
+
+        if "Platform Name" in line:
+            parts = line.split(":", 1) if ":" in line else line.split(None, 2)
+            if len(parts) > 1:
+                platforms.add(parts[-1].strip())
+
+        if "Device Name" in line:
+            if current_device:
+                if "Device Vendor" in current_device and "Device Type" in current_device:
+                    if "gpu" in current_device["Device Type"].lower() and re.search(r"amd|advanced micro devices", current_device["Device Vendor"], re.I):
+                        devices.append(current_device)
+                current_device = {}
+            in_device = True
+
+        if in_device and (":" in line or re.search(r" {2,}", line)):
+            try:
+                if ":" in line:
+                    key, val = map(str.strip, line.split(":", 1))
+                else:
+                    parts = re.split(r" {2,}", line)
+                    if len(parts) >= 2:
+                        key, val = parts[0].strip(), parts[1].strip()
+                    else:
+                        continue
+                current_device[key] = val
+            except ValueError:
+                continue
+
+    if current_device and "Device Vendor" in current_device and "Device Type" in current_device:
+        if "gpu" in current_device["Device Type"].lower() and re.search(r"amd|advanced micro devices", current_device["Device Vendor"], re.I):
+            devices.append(current_device)
+
+    return platforms, devices
 
 def check_opencl():
     info("Checking OpenCL runtime …")
@@ -91,14 +110,9 @@ def check_opencl():
         fail("Failed to run clinfo.")
         return False
 
-    platforms = set()
-    for line in clinfo_out.splitlines():
-        if "Platform Name" in line and ":" in line:
-            parts = line.split(":", 1)
-            platforms.add(parts[1].strip())
+    platforms, gpus = parse_opencl_devices(clinfo_out)
     info(f"Found OpenCL platform(s): {', '.join(sorted(platforms)) or 'none'}")
 
-    gpus = parse_opencl_devices(clinfo_out)
     if gpus:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(gpus)}")
         for idx, d in enumerate(gpus, 1):
@@ -113,10 +127,10 @@ def check_opencl():
         fail("No AMD GPU found in OpenCL device list.")
     return False
 
-def parse_vulkan_devices(vulkan_out):
+def parse_vulkan_devices(text):
     devices = []
     device = {}
-    for line in vulkan_out.splitlines():
+    for line in text.splitlines():
         line = line.strip()
         if "VkPhysicalDeviceProperties:" in line:
             if device:
@@ -167,14 +181,12 @@ def main():
         ok("All main checks passed – system ready. 🎉")
     else:
         fail("At least one check failed – see above.")
-
     print()
     info("For detailed inspection, try:")
     print("   lspci | grep -i vga")
     print("   clinfo")
     print("   vulkaninfo")
     print("   rocminfo")
-
     sys.exit(0 if opencl_ok and vulkan_ok else 1)
 
 if __name__ == "__main__":
