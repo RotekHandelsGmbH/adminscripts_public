@@ -96,29 +96,29 @@ The script checks for and installs these if missing:
 🧮 Scanning SATA disks...
 ⚡ Scanning NVMe disks...
 📤 Preparing output...
-🎯 0000:00:17.0 17.0 SATA controller: Intel Corporation Alder Lake-S PCH SATA Controller [AHCI Mode] (rev 11)
-  └── 💾 /dev/sda  (ATA      Samsung SSD 870 ,  3.6T, SATA, 🧩 link=3.0 Gb/s, ❤️ SMART: ✅ , 🌡️ 34°C, 🔢 SN: S758NS0X600195F, 🔧 FW: SVT03B6Q
-  └── 💾 /dev/sdb  (ATA      Samsung SSD 870 ,  3.6T, SATA, 🧩 link=6.0 Gb/s, ❤️ SMART: ✅ , 🌡️ 33°C, 🔢 SN: S758NX0X703692J, 🔧 FW: SVT03B6Q
-  └── 💾 /dev/sdc  (ATA      Samsung SSD 870 ,  3.6T, SATA, 🧩 link=6.0 Gb/s, ❤️ SMART: ✅ , 🌡️ 33°C, 🔢 SN: S758NX0X213593X, 🔧 FW: SVT03B6Q
-  └── 💾 /dev/sdd  (ATA      Samsung SSD 870 ,  3.6T, SATA, 🧩 link=6.0 Gb/s, ❤️ SMART: ✅ , 🌡️ 33°C, 🔢 SN: S758NS0X600166B, 🔧 FW: SVT03B6Q
+🎯 00:17.0 Intel Corporation Alder Lake-S PCH SATA Controller [AHCI Mode] (rev 11)
+  └── 💾 /dev/sda  (Samsung SSD 870, 3.6T, SATA6, 🧩 link=SATA6, ❤️ SMART: ✅ , 🌡️ 34°C, 🔢 SN: S758NS0X600195F, 🔧 FW: SVT03B6Q)
+  └── 💾 /dev/sdb  (Samsung SSD 870, 3.6T, SATA6, 🧩 link=SATA6, ❤️ SMART: ✅ , 🌡️ 33°C, 🔢 SN: S758NX0X703692J, 🔧 FW: SVT03B6Q)
+  └── 💾 /dev/sdc  (Samsung SSD 870, 3.6T, SATA6, 🧩 link=SATA6, ❤️ SMART: ✅ , 🌡️ 33°C, 🔢 SN: S758NX0X213593X, 🔧 FW: SVT03B6Q)
+  └── 💾 /dev/sdd  (Samsung SSD 870, 3.6T, SATA6, 🧩 link=SATA6, ❤️ SMART: ✅ , 🌡️ 33°C, 🔢 SN: S758NS0X600166B, 🔧 FW: SVT03B6Q)
 
-🎯 0000:06:00.0 00.0 Non-Volatile memory controller: Seagate Technology PLC FireCuda 530 SSD (rev 01)
-  └── 💾 /dev/nvme2n1  (0x0x0x1bb1 Seagate FireCuda 530 ZP4000GM30013,  3.6T, NVMe, 🧩 link=PCIe 16.0 GT/s PCIe PCIe x4, ❤️ SMART: ✅ , 🌡️ 39°C, 🔢 SN: 7VS00Z0B, 🔧 FW: SU6SM003
+🎯 03:00.0 Samsung Electronics Co Ltd NVMe SSD Controller PM9A1/PM9A3/980PRO
+  └── 💾 /dev/nvme0n1  Samsung SSD 980 PRO 2TB, 1.8T, NVMe, 🧩 link=PCIe 16.0 GT/s PCIe x4, ❤️ SMART: ✅ , 🌡️ 41°C, 🔢 SN: S69ENF0R202846D, 🔧 FW: 2B2QGXA7
 
-🎯 0000:0a:00.0 00.0 SATA controller: ASMedia Technology Inc. ASM1062 Serial ATA Controller (rev 02)
-  └── 💾 /dev/sde  (ATA      Samsung SSD 870 , 931.5G, SATA, 🧩 link=6.0 Gb/s, ❤️ SMART: ✅ , 🌡️ 33°C, 🔢 SN: S75CNX0X339421R, 🔧 FW: SVT03B6Q
+🎯 04:00.0 Seagate Technology PLC FireCuda 530 SSD (rev 01)
+  └── 💾 /dev/nvme1n1  Seagate FireCuda 530 ZP4000GM30013, 3.6T, NVMe, 🧩 link=PCIe 16.0 GT/s PCIe x4, ❤️ SMART: ✅ , 🌡️ 36°C, 🔢 SN: 7VS012NA, 🔧 FW: SU6SM005
 
-🎯 0000:04:00.0 00.0 Non-Volatile memory controller: Seagate Technology PLC FireCuda 530 SSD (rev 01)
-  └── 💾 /dev/nvme1n1  (0x0x0x1bb1 Seagate FireCuda 530 ZP4000GM30013,  3.6T, NVMe, 🧩 link=PCIe 16.0 GT/s PCIe PCIe x4, ❤️ SMART: ✅ , 🌡️ 36°C, 🔢 SN: 7VS012NA, 🔧 FW: SU6SM003
+🎯 06:00.0 Seagate Technology PLC FireCuda 530 SSD (rev 01)
+  └── 💾 /dev/nvme2n1  Seagate FireCuda 530 ZP4000GM30013, 3.6T, NVMe, 🧩 link=PCIe 16.0 GT/s PCIe x4, ❤️ SMART: ✅ , 🌡️ 39°C, 🔢 SN: 7VS00Z0B, 🔧 FW: SU6SM005
 
-🎯 0000:03:00.0 00.0 Non-Volatile memory controller: Samsung Electronics Co Ltd NVMe SSD Controller PM9A1/PM9A3/980PRO
-  └── 💾 /dev/nvme0n1  (0x0x0x144d Samsung SSD 980 PRO 2TB,  1.8T, NVMe, 🧩 link=PCIe 16.0 GT/s PCIe PCIe x4, ❤️ SMART: ✅ , 🌡️ 41°C, 🔢 SN: S69ENF0R202846D, 🔧 FW: 2B2QGXA7
+🎯 0a:00.0 ASMedia Technology Inc. ASM1062 Serial ATA Controller (rev 02)
+  └── 💾 /dev/sde  (Samsung SSD 870, 931.5G, SATA6, 🧩 link=SATA6, ❤️ SMART: ✅ , 🌡️ 33°C, 🔢 SN: S75CNX0X339421R, 🔧 FW: SVT03B6Q)
 
-🎯 0000:11:00.0 00.0 Non-Volatile memory controller: Seagate Technology PLC FireCuda 530 SSD (rev 01)
-  └── 💾 /dev/nvme3n1  (0x0x0x1bb1 Seagate FireCuda 530 ZP4000GM30013,  3.6T, NVMe, 🧩 link=PCIe 8.0 GT/s PCIe PCIe x4, ❤️ SMART: ✅ , 🌡️ 38°C, 🔢 SN: 7VS00XFD, 🔧 FW: SU6SM003
+🎯 11:00.0 Seagate Technology PLC FireCuda 530 SSD (rev 01)
+  └── 💾 /dev/nvme3n1  Seagate FireCuda 530 ZP4000GM30013, 3.6T, NVMe, 🧩 link=PCIe 8.0 GT/s PCIe x4, ❤️ SMART: ✅ , 🌡️ 38°C, 🔢 SN: 7VS00XFD, 🔧 FW: SU6SM005
 
-🎯 0000:12:00.0 00.0 Non-Volatile memory controller: Seagate Technology PLC FireCuda 530 SSD (rev 01)
-  └── 💾 /dev/nvme4n1  (0x0x0x1bb1 Seagate FireCuda 530 ZP4000GM30013,  3.6T, NVMe, 🧩 link=PCIe 16.0 GT/s PCIe PCIe x4, ❤️ SMART: ✅ , 🌡️ 36°C, 🔢 SN: 7VS00XN2, 🔧 FW: SU6SM003
+🎯 12:00.0 Seagate Technology PLC FireCuda 530 SSD (rev 01)
+  └── 💾 /dev/nvme4n1  Seagate FireCuda 530 ZP4000GM30013, 3.6T, NVMe, 🧩 link=PCIe 16.0 GT/s PCIe x4, ❤️ SMART: ✅ , 🌡️ 36°C, 🔢 SN: 7VS00XN2, 🔧 FW: SU6SM005
 ```
 
 ---
