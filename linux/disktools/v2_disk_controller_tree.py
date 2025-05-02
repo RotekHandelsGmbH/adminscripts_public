@@ -117,14 +117,37 @@ def get_sata_speed_label(info_text):
             return "SATA1"
         else:
             return f"SATA{speed.replace('.', '')}"
+
+    match = re.search(r'current:\s*([0-9.]+) Gb/s', info_text)
+    if match:
+        link_speed = match.group(1)
+        if link_speed.startswith("6"):
+            return "SATA6"
+        elif link_speed.startswith("3"):
+            return "SATA3"
+        elif link_speed.startswith("1.5"):
+            return "SATA1"
+
     return "SATA"
 
+def get_nvme_speed_label(speed, width):
+    gen_map = {
+        "2.5": "PCIe1",
+        "5.0": "PCIe2",
+        "8.0": "PCIe3",
+        "16.0": "PCIe4",
+        "32.0": "PCIe5",
+        "64.0": "PCIe6"
+    }
+    gen = gen_map.get(speed, "PCIe?")
+    return f"{gen} x{width}" if width and width.isdigit() else f"{gen}"
+
 def color_link_speed(link):
-    if re.match(r'(12|16|32|8)\.0', link):
+    if re.search(r'(PCIe[4-6]|SATA6)', link):
         return f"{BOLD_GREEN}🧩 link={link}{NC}"
-    elif "6.0" in link:
+    elif re.search(r'(PCIe3|SATA3)', link):
         return f"{GREEN}🧩 link={link}{NC}"
-    elif "3.0" in link:
+    elif re.search(r'(PCIe2|SATA1)', link):
         return f"{YELLOW}🧩 link={link}{NC}"
     return f"🧩 link={link}"
 
@@ -162,12 +185,10 @@ def process_sata_disks():
         protocol = get_sata_speed_label(info)
 
         linkspeed = ""
-        for line in info.splitlines():
-            if "current" in line.lower() and "Gb/s" in line:
-                found = re.search(r'([\d.]+ Gb/s)', line)
-                if found:
-                    linkspeed = found.group(1)
-        link_display = color_link_speed(linkspeed or "unknown")
+        match = re.search(r'current:\s*([0-9.]+ Gb/s)', info)
+        if match:
+            linkspeed = match.group(1)
+        link_display = color_link_speed(protocol)
 
         CONTROLLER_DISKS[controller].append(
             f"{GREEN}💾 {device}{NC}  ({vendor} {model}, {size}, {protocol}, "
@@ -214,8 +235,8 @@ def process_nvme_disks():
         except:
             width, speed = "unknown", "unknown"
 
-        link = f"PCIe {speed} PCIe x{width}"
-        link_display = color_link_speed(link)
+        protocol = get_nvme_speed_label(speed, width)
+        link_display = color_link_speed(protocol)
 
         CONTROLLER_DISKS[controller].append(
             f"{GREEN}💾 {nvdev}{NC}  (0x{vendorid} {model}, {size}, NVMe, "
