@@ -1,6 +1,6 @@
 # Mehr Durchblick im Platten-Dschungel: Das „Disk-to-Controller Tree Visualizer“-Tool
 
-## Wenn der Storage-Fehler zur Hölle wird...
+## Wenn die Storage-Wartung zur Hölle wird...
 
 Wer regelmäßig mit Servern arbeitet, die eine Vielzahl an Festplatten und unterschiedlichen Storage-Controllern nutzen, kennt das Problem: Im Fehlerfall wird es schnell unübersichtlich. Plattenausfälle, Temperaturprobleme, Firmwareversionen oder defekte Controller – und das alles quer verteilt über SATA, SAS und NVMe.
 
@@ -33,6 +33,7 @@ Gerade im Fehlerfall – wenn z.B. RAID-Volumes zusammenbrechen oder SMART-Fehle
 * *Wo hängt sie (physisch und logisch)?*
 * *Wie ist der Gesundheitszustand der anderen Laufwerke im selben Controller?*
 * *Laufen alle Platten mit der erwarteten Link-Speed (z.B. SATA6 statt SATA3)?*
+* *auf welchem HBA kann ich vielleicht noch eine Platte dazuquetschen ?*
 
 Genau hier spielt das Skript seine Stärke aus: Statt Dutzende Tools aufzurufen und Informationen manuell zu korrelieren, bekommt man sofort eine farblich strukturierte, logisch gruppierte Übersicht – direkt im Terminal.
 
@@ -52,22 +53,23 @@ Genau hier spielt das Skript seine Stärke aus: Statt Dutzende Tools aufzurufen 
 
 ## ⚙️ So funktioniert’s
 
-Das Skript nutzt systemnahe Werkzeuge (`smartctl`, `nvme`, `lsblk`, `lspci`) und parst deren Ausgaben intelligent, um relevante Informationen zu extrahieren und farblich zu bewerten. Schwache Linkgeschwindigkeiten werden z.B. rot hervorgehoben – ein häufig übersehenes Performanceproblem.
+Das Skript nutzt systemnahe Werkzeuge (`smartctl`, `nvme`, `lsblk`, `lspci`) und parst deren Ausgaben, um relevante Informationen zu extrahieren und übersichtlich darzustellen. Schwache Linkgeschwindigkeiten werden z.B. rot hervorgehoben – ein häufig übersehenes Performanceproblem.
 
 **Ausführung:**
 
 ```bash
-chmod +x disk_controller_tree.py
 sudo ./disk_controller_tree.py
+# oder
+sudo python3 ./disk_controller_tree.py
 ```
 
-> **Hinweis**: Root-Rechte sind notwendig, um SMART- und Controller-Daten vollständig auszulesen.
+> **Hinweis**: die Root-Rechte sind notwendig, um SMART- und Controller-Daten vollständig auszulesen.
 
 ---
 
 ## 📦 Abhängigkeiten
 
-Das Skript prüft beim Start automatisch, ob die folgenden Tools installiert sind und installiert diese im Hintergrund, wenn etwas fehlt:
+Das Skript prüft beim Start automatisch, ob die folgenden Tools installiert sind und installiert diese im Hintergrund, sollte etwas fehlen:
 
 * `smartmontools`
 * `nvme-cli`
