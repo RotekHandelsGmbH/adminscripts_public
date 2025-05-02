@@ -180,7 +180,6 @@ def summarize_vulkan(d):
     print(f"  Driver Version              : {d.get('driverVersion')}")
     print(f"  Device Type                 : {d.get('deviceType')}")
     print(f"  Vulkan API Version          : {d.get('apiVersion')}")
-    print(f"  Local Device Memory         : {d.get('Total Device Local Memory')}")
     print(f"  maxComputeWorkGroupInvocations : {d.get('maxComputeWorkGroupInvocations')}")
     print(f"  maxComputeSharedMemorySize     : {d.get('maxComputeSharedMemorySize')}")
 
