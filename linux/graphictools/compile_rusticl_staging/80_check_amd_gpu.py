@@ -65,31 +65,38 @@ def check_amdgpu():
 
 def parse_clinfo_blocks(text):
     blocks = []
-    current = {}
-    in_device = False
+    current_device = {}
+    in_device_section = False
 
     for line in text.splitlines():
         line = line.strip()
-        if line.startswith("Device Name"):
-            if current:
-                blocks.append(current)
-                current = {}
-            in_device = True
-        if in_device and ":" in line:
-            key, val = map(str.strip, line.split(":", 1))
-            current[key] = val
+        if not line or ":" not in line:
+            continue
 
-    if current:
-        blocks.append(current)
+        key, val = map(str.strip, line.split(":", 1))
+
+        if key.lower().startswith("device name"):
+            if current_device:
+                blocks.append(current_device)
+                current_device = {}
+            in_device_section = True
+
+        if in_device_section:
+            current_device[key] = val
+
+    if current_device:
+        blocks.append(current_device)
 
     # Filter for AMD GPUs
     amd_gpus = []
     for d in blocks:
+        name = d.get("Device Name", "").lower()
         vendor = d.get("Device Vendor", "").lower()
         dtype = d.get("Device Type", "").lower()
-        if "gpu" in dtype and any(kw in vendor for kw in [
-            "amd", "ati", "advanced micro devices", "amd inc", "mesa/x.org"
-        ]):
+
+        if (
+            "gpu" in dtype or "gpu" in name or "gpu" in d.get("Device Profile", "").lower()
+        ) and any(kw in vendor for kw in ["amd", "ati", "advanced micro devices", "amd inc", "mesa/x.org"]):
             amd_gpus.append(d)
 
     return amd_gpus
@@ -112,14 +119,18 @@ def check_opencl():
         fail("Failed to execute clinfo.")
         return False
 
-    platforms = [line.split(":")[-1].strip() for line in clinfo_out.splitlines() if "Platform Name" in line]
+    platforms = set()
+    for line in clinfo_out.splitlines():
+        if "Platform Name" in line:
+            _, val = line.split(":", 1)
+            platforms.add(val.strip())
     info(f"Found OpenCL platform(s): {', '.join(platforms) or 'none'}")
 
     gpus = parse_clinfo_blocks(clinfo_out)
     if gpus:
         ok(f"AMD GPU(s) detected as OpenCL device(s) – Count: {len(gpus)}")
-        print("\nOpenCL GPU Summary:")
-        for d in gpus:
+        for idx, d in enumerate(gpus, 1):
+            print(f"\nOpenCL GPU #{idx}:")
             print(f"  Name            : {d.get('Device Name', 'N/A')}")
             print(f"  Compute Units   : {d.get('Max compute units', 'N/A')}")
             print(f"  Clock Frequency : {d.get('Max clock frequency', 'N/A')} MHz")
