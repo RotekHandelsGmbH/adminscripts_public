@@ -85,7 +85,8 @@ def check_opencl_details(clinfo):
                     parts = line.split(":", 1)
                     if len(parts) == 2:
                         summary[parts[0].strip()] = parts[1].strip()
-            if "amd" in summary.get("Device Vendor", "").lower():
+            vendor_string = summary.get("Device Vendor", "").lower()
+            if any(v in vendor_string for v in ["amd", "ati", "advanced micro devices", "amd inc"]):
                 if not printed:
                     print("\nOpenCL GPU Summary:")
                     printed = True
