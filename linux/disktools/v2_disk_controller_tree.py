@@ -7,6 +7,7 @@ from collections import defaultdict
 
 # Terminal colors
 RED = '\033[0;31m'
+BOLD_RED = '\033[1;31m'
 GREEN = '\033[0;32m'
 BOLD_GREEN = '\033[1;32m'
 BLUE = '\033[0;34m'
@@ -76,7 +77,7 @@ def color_link_speed(link, max_iface=None):
     max_val = speed_order.get(max_iface, 0)
 
     if max_val and link_val < max_val:
-        return f"{RED}🧩 link={link}{NC}"
+        return f"{BOLD_RED}🧩 link={link}{NC}"
     elif "SATA6" in link:
         return f"{GREEN}🧩 link={link}{NC}"
     elif "SATA3" in link:
@@ -138,19 +139,16 @@ def process_nvme_disks():
             model = re.search(r"mn\s*:\s*(.+)", idctrl, re.IGNORECASE)
             serial = re.search(r"sn\s*:\s*(.+)", idctrl, re.IGNORECASE)
             firmware = re.search(r"fr\s*:\s*(.+)", idctrl, re.IGNORECASE)
-            vendorid = re.search(r"vid\s*:\s*(.+)", idctrl, re.IGNORECASE)
             model = clean_model_name(model.group(1).strip()) if model else "unknown"
             serial = serial.group(1).strip() if serial else "unknown"
             firmware = firmware.group(1).strip() if firmware else "unknown"
-            vendorid = vendorid.group(1).strip() if vendorid else "unknown"
             size = run(f"lsblk -dn -o SIZE {nvdev}")
             smart_log = run(f"nvme smart-log {nvdev}")
             crit_warn = re.search(r"critical_warning\s*:\s*(\d+)", smart_log)
             health = format_smart_health("OK" if crit_warn and crit_warn.group(1) == "0" else "FAILED")
             temperature = get_drive_temperature(nvdev)
-            base = entry[:-2]
-            width = run(f"cat /sys/class/nvme/{base}/device/current_link_width")
-            speed = run(f"cat /sys/class/nvme/{base}/device/current_link_speed")
+            width = run(f"cat /sys/class/nvme/{entry[:-2]}/device/current_link_width")
+            speed = run(f"cat /sys/class/nvme/{entry[:-2]}/device/current_link_speed")
             link = f"PCIe {speed} x{width}".strip()
             link_display = color_link_speed(link)
 
