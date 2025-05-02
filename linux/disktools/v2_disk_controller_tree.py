@@ -3,13 +3,12 @@ import os
 import re
 import shutil
 import subprocess
+import json
 from collections import defaultdict
-
-# ── Global Variables ──────────────────────────────────────────────────────────────────
 
 CONTROLLER_DISKS = defaultdict(list)
 
-# ── Colors ─────────────────────────────────────────────────────────────────────────────
+# ── ANSI Colors ───────────────────────────────────────
 
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
@@ -19,26 +18,13 @@ CYAN = '\033[0;36m'
 YELLOW = '\033[1;33m'
 NC = '\033[0m'
 
-# ── Utility Functions ─────────────────────────────────────────────────────────────────
+# ── System Utilities ─────────────────────────────────
 
 def run(cmd):
     try:
         return subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         return ""
-
-def print_header():
-    print(f"""
-{BOLD_GREEN}
-╔═══════════════════════════════════════════════════════════════════════════════════════╗
-║ 🧩  Disk-to-Controller Tree Visualizer                                                 ║
-║ 👤  Author : bitranox                                                                  ║
-║ 🏛️  License: MIT                                                                       ║
-║ 💾  Shows disks grouped by controller with model, size, interface, link speed,         ║
-║     SMART status, drive temperature, serial number, and firmware revision             ║
-╚═══════════════════════════════════════════════════════════════════════════════════════╝
-{NC}
-""")
 
 def check_root():
     if os.geteuid() != 0:
@@ -53,6 +39,21 @@ def check_dependencies():
             print(f"{YELLOW}Missing required tool: {tool}{NC}")
             exit(1)
 
+def print_header():
+    print(f"""
+{BOLD_GREEN}
+╔═══════════════════════════════════════════════════════════════════════════════════════╗
+║ 🧩  Disk-to-Controller Tree Visualizer                                                 ║
+║ 👤  Author : bitranox                                                                  ║
+║ 🏛️  License: MIT                                                                       ║
+║ 💾  Shows disks grouped by controller with model, size, interface, link speed,         ║
+║     SMART status, drive temperature, serial number, and firmware revision             ║
+╚═══════════════════════════════════════════════════════════════════════════════════════╝
+{NC}
+""")
+
+# ── Controller & PCI ─────────────────────────────────
+
 def get_storage_controller(devpath):
     try:
         real_path = os.path.realpath(devpath)
@@ -66,102 +67,57 @@ def get_storage_controller(devpath):
         pass
     return "Unknown Controller"
 
-def parse_smartctl_output(output, key):
-    for line in output.splitlines():
-        if key.lower() in line.lower():
-            parts = line.split(":", 1)
-            if len(parts) == 2:
-                return parts[1].strip()
-    return "unknown"
-
-def parse_smart_health(output):
-    for line in output.splitlines():
-        if 'smart' in line.lower() and ('result' in line.lower() or 'assessment' in line.lower()):
-            return line.split(":", 1)[-1].strip()
-    return ""
-
-def format_smart_health(status):
-    if status.upper() in ('PASSED', 'OK', '0'):
-        return "❤️ SMART: ✅ ,"
-    elif not status:
-        return "❤️ SMART: ❓ ,"
-    else:
-        return f"{RED}❤️ SMART: ⚠️ ,{NC}"
-
-def get_drive_temperature(device, dtype):
-    if dtype == "sata":
-        output = run(f"smartctl -A {device}")
-        for line in output.splitlines():
-            if 'temp' in line.lower() and len(line.split()) >= 10:
-                temp = line.split()[9]
-                if temp.isdigit():
-                    return f"🌡️ {temp}°C,"
-    elif dtype == "nvme":
-        output = run(f"nvme smart-log {device}")
-        for line in output.splitlines():
-            if line.strip().lower().startswith("temperature"):
-                temp = re.search(r'(\d+)', line)
-                if temp:
-                    return f"🌡️ {temp.group(1)}°C,"
-    return "🌡️ N/A,"
-
-def get_sata_speed_label(info_text):
-    match = re.search(r"SATA Version is:\s*([0-9.]+)", info_text)
-    if match:
-        speed = match.group(1)
-        if speed.startswith("6"):
-            return "SATA6"
-        elif speed.startswith("3"):
-            return "SATA3"
-        elif speed.startswith("1.5"):
-            return "SATA1"
-        else:
-            return f"SATA{speed.replace('.', '')}"
-
-    match = re.search(r'current:\s*([0-9.]+) Gb/s', info_text)
-    if match:
-        link_speed = match.group(1)
-        if link_speed.startswith("6"):
-            return "SATA6"
-        elif link_speed.startswith("3"):
-            return "SATA3"
-        elif link_speed.startswith("1.5"):
-            return "SATA1"
-
-    return "SATA"
-
-def get_nvme_speed_label(speed, width):
-    gen_map = {
-        "2.5": "PCIe1",
-        "5.0": "PCIe2",
-        "8.0": "PCIe3",
-        "16.0": "PCIe4",
-        "32.0": "PCIe5",
-        "64.0": "PCIe6"
-    }
-    gen = gen_map.get(speed, "PCIe?")
-    return f"{gen} x{width}" if width and width.isdigit() else f"{gen}"
-
-def color_link_speed(link):
-    if re.search(r'(PCIe[4-6]|SATA6)', link):
-        return f"{BOLD_GREEN}🧩 link={link}{NC}"
-    elif re.search(r'(PCIe3|SATA3)', link):
-        return f"{GREEN}🧩 link={link}{NC}"
-    elif re.search(r'(PCIe2|SATA1)', link):
-        return f"{YELLOW}🧩 link={link}{NC}"
-    return f"🧩 link={link}"
-
-def get_smart_field(device, label):
-    output = run(f"smartctl -i {device}")
-    return parse_smartctl_output(output, label)
-
 def pci_sort_key(controller_id):
     match = re.match(r'([0-9a-f]{2}):([0-9a-f]{2})\.([0-9])', controller_id)
     if match:
         return tuple(int(x, 16) for x in match.groups())
     return (999, 999, 999)
 
-# ── Disk Scanning ─────────────────────────────────────────────────────────────────────
+# ── Utility Functions ────────────────────────────────
+
+def format_bytes(size_bytes):
+    if size_bytes >= 1 << 40:
+        return f"{size_bytes / (1 << 40):.1f}T"
+    elif size_bytes >= 1 << 30:
+        return f"{size_bytes / (1 << 30):.1f}G"
+    elif size_bytes >= 1 << 20:
+        return f"{size_bytes / (1 << 20):.1f}M"
+    return f"{size_bytes}B"
+
+def format_smart_health(passed):
+    if passed is True:
+        return "❤️ SMART: ✅ ,"
+    elif passed is False:
+        return f"{RED}❤️ SMART: ⚠️ ,{NC}"
+    return "❤️ SMART: ❓ ,"
+
+def get_temperature_from_attributes(attr_table):
+    for attr in attr_table:
+        if attr["id"] in [194, 190]:
+            raw = attr.get("raw", {}).get("value")
+            if isinstance(raw, int):
+                return f"🌡️ {raw}°C,"
+    return "🌡️ N/A,"
+
+def get_sata_speed_label(speed_str):
+    if "6.0" in speed_str:
+        return "SATA6"
+    elif "3.0" in speed_str:
+        return "SATA3"
+    elif "1.5" in speed_str:
+        return "SATA1"
+    return "SATA"
+
+def color_link_speed(link):
+    if re.search(r'(SATA6)', link):
+        return f"{BOLD_GREEN}🧩 link={link}{NC}"
+    elif re.search(r'(SATA3)', link):
+        return f"{GREEN}🧩 link={link}{NC}"
+    elif re.search(r'(SATA1)', link):
+        return f"{YELLOW}🧩 link={link}{NC}"
+    return f"🧩 link={link}"
+
+# ── SATA Disk Handler (JSON-based) ──────────────────
 
 def process_sata_disks():
     print(f"{BLUE}🧮 Scanning SATA disks...{NC}")
@@ -172,22 +128,30 @@ def process_sata_disks():
         devpath = f"/sys/block/{dev}/device"
         controller = get_storage_controller(devpath)
 
-        model = run(f"cat {devpath}/model").strip()
-        vendor = run(f"cat {devpath}/vendor").strip()
-        size = run(f"lsblk -dn -o SIZE {device}").strip()
-        serial = get_smart_field(device, "Serial Number")
-        firmware = get_smart_field(device, "Firmware Version")
-        smart_health_raw = run(f"smartctl -H {device}")
-        smart_health = format_smart_health(parse_smart_health(smart_health_raw))
-        temperature = get_drive_temperature(device, "sata")
+        smart_json_raw = run(f"smartctl -j -a {device}")
+        if not smart_json_raw.strip():
+            continue
 
-        info = run(f"smartctl -i {device}")
-        protocol = get_sata_speed_label(info)
+        try:
+            data = json.loads(smart_json_raw)
+        except json.JSONDecodeError:
+            continue
 
-        linkspeed = ""
-        match = re.search(r'current:\s*([0-9.]+ Gb/s)', info)
-        if match:
-            linkspeed = match.group(1)
+        model = data.get("model_name", "unknown")
+        vendor = data.get("model_family", "unknown")
+        serial = data.get("serial_number", "unknown")
+        firmware = data.get("firmware_version", "unknown")
+        size_bytes = data.get("user_capacity", {}).get("bytes", 0)
+        size = format_bytes(size_bytes)
+
+        smart_passed = data.get("smart_status", {}).get("passed")
+        smart_health = format_smart_health(smart_passed)
+
+        attributes = data.get("ata_smart_attributes", {}).get("table", [])
+        temperature = get_temperature_from_attributes(attributes)
+
+        speed_str = data.get("interface_speed", {}).get("max", {}).get("string", "")
+        protocol = get_sata_speed_label(speed_str)
         link_display = color_link_speed(protocol)
 
         CONTROLLER_DISKS[controller].append(
@@ -195,55 +159,7 @@ def process_sata_disks():
             f"{link_display}, {smart_health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
         )
 
-def process_nvme_disks():
-    print(f"{BLUE}⚡ Scanning NVMe disks...{NC}")
-    for entry in os.listdir("/dev"):
-        if not re.match(r'nvme\d+n1$', entry):
-            continue
-        nvdev = f"/dev/{entry}"
-        sysdev = f"/sys/block/{entry}/device"
-        controller = get_storage_controller(sysdev)
-
-        idctrl = run(f"nvme id-ctrl -H {nvdev}")
-        if not idctrl:
-            print(f"{RED}⚠️  Failed to read NVMe info from {nvdev} — skipping.{NC}")
-            continue
-
-        def grep_val(field):
-            for line in idctrl.splitlines():
-                if line.strip().lower().startswith(field.lower()):
-                    return line.split(":", 1)[-1].strip()
-            return "??"
-
-        model = grep_val("MN")
-        vendorid = grep_val("VID")
-        serial = grep_val("SN")
-        firmware = grep_val("FR")
-        size = run(f"lsblk -dn -o SIZE {nvdev}")
-        crit_warn_val = grep_val("critical_warning")
-        smart_health = format_smart_health(crit_warn_val)
-        temperature = get_drive_temperature(nvdev, "nvme")
-
-        base = entry[:-2]
-        width_path = f"/sys/class/nvme/{base}/device/current_link_width"
-        speed_path = f"/sys/class/nvme/{base}/device/current_link_speed"
-        try:
-            with open(width_path) as f:
-                width = f.read().strip()
-            with open(speed_path) as f:
-                speed = f.read().strip()
-        except:
-            width, speed = "unknown", "unknown"
-
-        protocol = get_nvme_speed_label(speed, width)
-        link_display = color_link_speed(protocol)
-
-        CONTROLLER_DISKS[controller].append(
-            f"{GREEN}💾 {nvdev}{NC}  (0x{vendorid} {model}, {size}, NVMe, "
-            f"{link_display}, {smart_health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
-        )
-
-# ── Output ────────────────────────────────────────────────────────────────────────────
+# ── Output ───────────────────────────────────────────
 
 def print_output():
     print(f"{BLUE}📤 Preparing output...{NC}")
@@ -254,12 +170,12 @@ def print_output():
             print(f"  └── {dev}")
         print("")
 
-# ── Main ──────────────────────────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────
 
 if __name__ == "__main__":
     check_root()
     print_header()
     check_dependencies()
-    process_sata_disks()
-    process_nvme_disks()
+    process_sata_disks()  # JSON-based SATA parsing
+    # process_nvme_disks()  ← still needs JSON support!
     print_output()
