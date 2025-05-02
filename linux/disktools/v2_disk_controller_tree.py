@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import os
 import re
+import shutil
 import subprocess
 from collections import defaultdict
 
-# ── Setup ─────────────────────────────────────────────────────────────────────────────
+# ── Global Variables ──────────────────────────────────────────────────────────────────
 
 CONTROLLER_DISKS = defaultdict(list)
 
@@ -46,7 +47,7 @@ def check_root():
 
 def check_dependencies():
     print(f"{BLUE}🔍 Checking dependencies...{NC}")
-    required = ['smartctl', 'nvme']
+    required = ['smartctl', 'nvme', 'lspci']
     for tool in required:
         if not shutil.which(tool):
             print(f"{YELLOW}Missing required tool: {tool}{NC}")
@@ -55,11 +56,12 @@ def check_dependencies():
 def get_storage_controller(devpath):
     try:
         real_path = run(f"realpath {devpath}")
-        addresses = re.findall(r'([0-9a-f]{4}:)?[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]', real_path)
+        addresses = re.findall(r'([0-9a-f]{2}:[0-9a-f]{2}\.[0-9])', real_path)
         for addr in reversed(addresses):
-            ctrl = run(f"lspci -s {addr}")
-            if re.search(r'sata|raid|sas|storage controller|non-volatile', ctrl, re.IGNORECASE):
-                return f"{addr} {ctrl.split(':', 1)[-1]}"
+            ctrl_line = run(f"lspci -s {addr}")
+            if re.search(r'sata|raid|sas|storage controller|non-volatile', ctrl_line, re.IGNORECASE):
+                parts = ctrl_line.split(":", 2)
+                return f"{addr} {parts[-1].strip()}"
     except Exception:
         pass
     return "Unknown Controller"
@@ -97,7 +99,13 @@ def get_smart_field(device, label):
     match = re.search(f"{label}:\\s*(.+)", output, re.IGNORECASE)
     return match.group(1).strip() if match else "unknown"
 
-# ── Disk Processing ───────────────────────────────────────────────────────────────────
+def pci_sort_key(controller_id):
+    match = re.match(r'([0-9a-f]{2}):([0-9a-f]{2})\.([0-9])', controller_id)
+    if match:
+        return tuple(int(x, 16) for x in match.groups())
+    return (999, 999, 999)  # unknowns at end
+
+# ── Disk Scanning ─────────────────────────────────────────────────────────────────────
 
 def process_sata_disks():
     print(f"{BLUE}🧮 Scanning SATA disks...{NC}")
@@ -120,7 +128,10 @@ def process_sata_disks():
                     run(f"smartctl -i {device} | grep -oP 'SATA.*,[[:space:]]*\\K[0-9.]+ Gb/s' | head -1")
         link_display = color_link_speed(linkspeed or "unknown")
 
-        CONTROLLER_DISKS[controller].append(f"{GREEN}💾 {device}{NC}  ({vendor} {model}, {size}, {protocol or 'unknown'}, {link_display}, {smart_health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})")
+        CONTROLLER_DISKS[controller].append(
+            f"{GREEN}💾 {device}{NC}  ({vendor} {model}, {size}, {protocol or 'unknown'}, "
+            f"{link_display}, {smart_health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
+        )
 
 def process_nvme_disks():
     print(f"{BLUE}⚡ Scanning NVMe disks...{NC}")
@@ -136,37 +147,44 @@ def process_nvme_disks():
             print(f"{RED}⚠️  Failed to read NVMe info from {nvdev} — skipping.{NC}")
             continue
 
-        model = re.search(r'MN\s*:\s*(.*)', idctrl)
-        vendorid = re.search(r'VID\s*:\s*(.*)', idctrl)
-        serial = re.search(r'SN\s*:\s*(.*)', idctrl)
-        firmware = re.search(r'FR\s*:\s*(.*)', idctrl)
+        def grep_val(pattern):
+            m = re.search(pattern + r'\s*:\s*(.*)', idctrl)
+            return m.group(1).strip() if m else "??"
+
+        model = grep_val("MN")
+        vendorid = grep_val("VID")
+        serial = grep_val("SN")
+        firmware = grep_val("FR")
         size = run(f"lsblk -dn -o SIZE {nvdev}")
         crit_warn = run(f"nvme smart-log {nvdev} | awk -F: '/^critical_warning/ {{print $2}}'")
         smart_health = format_smart_health(crit_warn)
         temperature = get_drive_temperature(nvdev, "nvme")
 
-        base = entry[:-2]  # Strip 'n1'
+        base = entry[:-2]
         width = run(f"cat /sys/class/nvme/{base}/device/current_link_width")
         speed = run(f"cat /sys/class/nvme/{base}/device/current_link_speed")
         link = f"PCIe {speed or 'unknown'} PCIe x{width or 'unknown'}"
         link_display = color_link_speed(link)
 
-        CONTROLLER_DISKS[controller].append(f"{GREEN}💾 {nvdev}{NC}  (0x{vendorid.group(1) if vendorid else '??'} {model.group(1) if model else '??'}, {size}, NVMe, {link_display}, {smart_health} {temperature} 🔢 SN: {serial.group(1) if serial else '??'}, 🔧 FW: {firmware.group(1) if firmware else '??'})")
+        CONTROLLER_DISKS[controller].append(
+            f"{GREEN}💾 {nvdev}{NC}  (0x{vendorid} {model}, {size}, NVMe, "
+            f"{link_display}, {smart_health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
+        )
 
 # ── Output ────────────────────────────────────────────────────────────────────────────
 
 def print_output():
     print(f"{BLUE}📤 Preparing output...{NC}")
-    for ctrl, devices in CONTROLLER_DISKS.items():
+    sorted_keys = sorted(CONTROLLER_DISKS.keys(), key=lambda k: pci_sort_key(k.split()[0]))
+    for ctrl in sorted_keys:
         print(f"{CYAN}🎯 {ctrl}{NC}")
-        for dev in devices:
+        for dev in CONTROLLER_DISKS[ctrl]:
             print(f"  └── {dev}")
         print("")
 
 # ── Main ──────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import shutil
     check_root()
     print_header()
     check_dependencies()
