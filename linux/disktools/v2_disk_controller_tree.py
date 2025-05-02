@@ -5,9 +5,10 @@ import subprocess
 import json
 from collections import defaultdict
 
+# ─────────────────────────────────────────────────────
+# Constants & Globals
+# ─────────────────────────────────────────────────────
 CONTROLLER_DISKS = defaultdict(list)
-
-# ── Colors ──────────────────────────────────────────────────────────
 
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
@@ -17,7 +18,10 @@ CYAN = '\033[0;36m'
 YELLOW = '\033[1;33m'
 NC = '\033[0m'
 
-# ── Helpers ─────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────
+# Core Utility Functions
+# ─────────────────────────────────────────────────────
 
 def run(cmd):
     try:
@@ -25,30 +29,9 @@ def run(cmd):
     except subprocess.CalledProcessError:
         return ""
 
-def check_root():
-    if os.geteuid() != 0:
-        print(f"{RED}❌ This script must be run as root.{NC}")
-        exit(1)
-
-def print_header():
-    print(f"""
-{BOLD_GREEN}
-╔═══════════════════════════════════════════════════════════════════════════════════════╗
-║ 🧩  Disk-to-Controller Tree Visualizer                                                 ║
-║ 👤  Author : bitranox                                                                  ║
-║ 🏛️  License: MIT                                                                       ║
-║ 💾  Shows disks grouped by controller with model, size, interface, link speed,         ║
-║     SMART status, drive temperature, serial number, and firmware revision             ║
-╚═══════════════════════════════════════════════════════════════════════════════════════╝
-{NC}
-""")
-
-def check_dependencies():
-    print(f"{BLUE}🔍 Checking dependencies...{NC}")
-    for tool in ['lsblk', 'smartctl', 'lspci', 'udevadm']:
-        if not shutil.which(tool):
-            print(f"{RED}Missing tool: {tool}{NC}")
-            exit(1)
+def get_all_block_devices():
+    lines = run("lsblk -dn -o NAME").splitlines()
+    return [f"/dev/{name.strip()}" for name in lines]
 
 def get_storage_controller(devpath):
     try:
@@ -68,6 +51,89 @@ def pci_sort_key(ctrl):
         return tuple(int(x, 16) for x in match.groups())
     return (999, 999, 999)
 
+# ─────────────────────────────────────────────────────
+# SMART Parsing Logic
+# ─────────────────────────────────────────────────────
+
+def try_smartctl_json(device):
+    for cmd in [f"smartctl -j -a {device}", f"smartctl -j -a -d sat {device}"]:
+        raw = run(cmd)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+def try_smartctl_text(device):
+    for cmd in [f"smartctl -a {device}", f"smartctl -a -d sat {device}"]:
+        output = run(cmd)
+        if "Model Family" in output or "SMART support is:" in output:
+            return output
+    return ""
+
+def parse_sata_capabilities(text):
+    match = re.search(r"SATA Version is:\s*(.*)", text)
+    if match:
+        capability = match.group(1).strip()
+        if "6.0" in capability:
+            return "SATA6"
+        if "3.0" in capability:
+            return "SATA3"
+        if "1.5" in capability:
+            return "SATA1"
+    return "SATA?"
+
+def parse_current_link_speed(text):
+    match = re.search(r"current:\s*([0-9.]+ Gb/s)", text)
+    if match:
+        speed = match.group(1)
+        if "6.0" in speed:
+            return "SATA6"
+        if "3.0" in speed:
+            return "SATA3"
+        if "1.5" in speed:
+            return "SATA1"
+    return "SATA?"
+
+def parse_smart_health(text):
+    match = re.search(r"SMART.*(PASSED|OK|FAILED)", text, re.IGNORECASE)
+    if match:
+        return match.group(1).upper()
+    return None
+
+def parse_fallback_temperature(text):
+    match = re.search(r"Temperature.*?\s(\d+)\s*C", text)
+    if match:
+        return f"🌡️ {match.group(1)}°C,"
+    return "🌡️ N/A,"
+
+# ─────────────────────────────────────────────────────
+# Formatting
+# ─────────────────────────────────────────────────────
+
+def compact_model_name(vendor, model):
+    if vendor and model.startswith(vendor):
+        return model
+    if vendor in model:
+        return model.replace(vendor, "").strip(" -")
+    return model
+
+def format_smart_health(value):
+    if value in ("PASSED", "OK"):
+        return "❤️ SMART: ✅ ,"
+    elif value == "FAILED":
+        return f"{RED}❤️ SMART: ⚠️ ,{NC}"
+    return "❤️ SMART: ❓ ,"
+
+def color_link_speed(label):
+    if "SATA6" in label:
+        return f"{BOLD_GREEN}🧩 link={label}{NC}"
+    elif "SATA3" in label:
+        return f"{GREEN}🧩 link={label}{NC}"
+    elif "SATA1" in label:
+        return f"{YELLOW}🧩 link={label}{NC}"
+    return f"🧩 link={label}"
+
 def format_bytes(size):
     try:
         size = int(size)
@@ -78,95 +144,58 @@ def format_bytes(size):
     except:
         return "N/A"
 
-def format_temp(attrs):
-    for attr in attrs:
-        if attr["id"] in [190, 194]:
-            raw = attr.get("raw", {})
-            if "string" in raw and raw["string"].isdigit():
-                return f"🌡️ {raw['string']}°C,"
-            if isinstance(raw.get("value"), int) and 0 < raw["value"] < 150:
-                return f"🌡️ {raw['value']}°C,"
-    return "🌡️ N/A,"
+# ─────────────────────────────────────────────────────
+# Drive Handler
+# ─────────────────────────────────────────────────────
 
-def compact_model_name(vendor, model):
-    if vendor and model.startswith(vendor):
-        return model
-    if vendor in model:
-        return model.replace(vendor, "").strip(" -")
-    return model
+def process_drive(device):
+    devname = os.path.basename(device)
+    sys_path = f"/sys/block/{devname}/device"
+    controller = get_storage_controller(sys_path)
 
-def link_label(speed):
-    if "6.0" in speed:
-        return "SATA6"
-    if "3.0" in speed:
-        return "SATA3"
-    if "1.5" in speed:
-        return "SATA1"
-    return "SATA"
-
-def color_link_speed(label):
-    if "SATA6" in label:
-        return f"{BOLD_GREEN}🧩 link={label}{NC}"
-    if "SATA3" in label:
-        return f"{GREEN}🧩 link={label}{NC}"
-    if "SATA1" in label:
-        return f"{YELLOW}🧩 link={label}{NC}"
-    return f"🧩 link={label}"
-
-def smart_health(passed):
-    if passed is True:
-        return "❤️ SMART: ✅ ,"
-    if passed is False:
-        return f"{RED}❤️ SMART: ⚠️ ,{NC}"
-    return "❤️ SMART: ❓ ,"
-
-def load_smart_data(dev):
-    for cmd in [f"smartctl -j -a {dev}", f"smartctl -j -a -d sat {dev}"]:
-        raw = run(cmd)
-        try:
-            return json.loads(raw)
-        except:
-            continue
-    return None
-
-# ── Main Logic ─────────────────────────────────────────────────────
-
-def process_disks():
-    print(f"{BLUE}🧮 Scanning disks...{NC}")
-    lines = run("lsblk -dn -o NAME").splitlines()
-    for name in lines:
-        device = f"/dev/{name.strip()}"
-        sys_path = f"/sys/block/{name.strip()}/device"
-        controller = get_storage_controller(sys_path)
-
-        data = load_smart_data(device)
-        if data:
-            model_raw = data.get("model_name", "unknown")
-            vendor = data.get("model_family", "")
-            model = compact_model_name(vendor, model_raw)
-            serial = data.get("serial_number", "unknown")
-            firmware = data.get("firmware_version", "unknown")
-            size = format_bytes(data.get("user_capacity", {}).get("bytes", 0))
-            health = smart_health(data.get("smart_status", {}).get("passed"))
-            temp = format_temp(data.get("ata_smart_attributes", {}).get("table", []))
-            speed_str = data.get("interface_speed", {}).get("max", {}).get("string", "")
-            proto = link_label(speed_str)
-            link = color_link_speed(proto)
-        else:
-            # Fallback
-            model = run(f"udevadm info --query=all --name={device} | grep ID_MODEL=").strip().split('=')[-1]
-            serial = run(f"udevadm info --query=all --name={device} | grep ID_SERIAL_SHORT=").strip().split('=')[-1]
-            size = run(f"lsblk -dn -o SIZE {device}").strip()
-            firmware = "unknown"
-            temp = "🌡️ N/A,"
-            health = "❤️ SMART: ❓ ,"
-            proto = "SATA?"
-            link = color_link_speed(proto)
-
-        CONTROLLER_DISKS[controller].append(
-            f"{GREEN}💾 {device}{NC}  ({model}, {size}, {proto}, {link}, "
-            f"{health} {temp} 🔢 SN: {serial}, 🔧 FW: {firmware})"
+    data = try_smartctl_json(device)
+    if data:
+        model = compact_model_name(data.get("model_family", ""), data.get("model_name", "unknown"))
+        serial = data.get("serial_number", "unknown")
+        firmware = data.get("firmware_version", "unknown")
+        size = format_bytes(data.get("user_capacity", {}).get("bytes", 0))
+        health = format_smart_health(data.get("smart_status", {}).get("passed"))
+        attributes = data.get("ata_smart_attributes", {}).get("table", [])
+        temp = "🌡️ N/A,"
+        for attr in attributes:
+            if attr["id"] in [194, 190]:
+                val = attr.get("raw", {}).get("value")
+                if isinstance(val, int) and 0 < val < 150:
+                    temp = f"🌡️ {val}°C,"
+                    break
+        proto = parse_sata_capabilities(data.get("interface_speed", {}).get("string", ""))
+        link = color_link_speed(parse_current_link_speed(data.get("interface_speed", {}).get("string", "")))
+    else:
+        txt = try_smartctl_text(device)
+        model = re.search(r"Device Model:\s*(.+)", txt)
+        vendor = re.search(r"Model Family:\s*(.+)", txt)
+        serial = re.search(r"Serial Number:\s*(.+)", txt)
+        firmware = re.search(r"Firmware Version:\s*(.+)", txt)
+        size = run(f"lsblk -dn -o SIZE {device}").strip()
+        model = compact_model_name(
+            vendor.group(1).strip() if vendor else "",
+            model.group(1).strip() if model else "unknown"
         )
+        serial = serial.group(1).strip() if serial else "unknown"
+        firmware = firmware.group(1).strip() if firmware else "unknown"
+        health = format_smart_health(parse_smart_health(txt))
+        temp = parse_fallback_temperature(txt)
+        proto = parse_sata_capabilities(txt)
+        link = color_link_speed(parse_current_link_speed(txt))
+
+    CONTROLLER_DISKS[controller].append(
+        f"{GREEN}💾 {device}{NC}  ({model}, {size}, {proto}, {link}, "
+        f"{health} {temp} 🔢 SN: {serial}, 🔧 FW: {firmware})"
+    )
+
+# ─────────────────────────────────────────────────────
+# Output
+# ─────────────────────────────────────────────────────
 
 def print_output():
     print(f"{BLUE}📤 Preparing output...{NC}")
@@ -176,12 +205,36 @@ def print_output():
             print(f"  └── {disk}")
         print()
 
-# ── Main ───────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────
+# Entry Point
+# ─────────────────────────────────────────────────────
+
+def main():
+    if os.geteuid() != 0:
+        print(f"{RED}❌ Run as root!{NC}")
+        exit(1)
+    print(f"{BOLD_GREEN}")
+    print("╔═══════════════════════════════════════════════════════════════════════════════════════╗")
+    print("║ 🧩  Disk-to-Controller Tree Visualizer                                                 ║")
+    print("║ 👤  Author : bitranox                                                                  ║")
+    print("║ 🏛️  License: MIT                                                                       ║")
+    print("║ 💾  Shows disks grouped by controller with model, size, interface, link speed,         ║")
+    print("║     SMART status, drive temperature, serial number, and firmware revision             ║")
+    print("╚═══════════════════════════════════════════════════════════════════════════════════════╝")
+    print(f"{NC}")
+    print(f"{BLUE}🔍 Checking dependencies...{NC}")
+    for cmd in ["smartctl", "lsblk", "lspci"]:
+        if not shutil.which(cmd):
+            print(f"{RED}Missing: {cmd}{NC}")
+            exit(1)
+
+    print(f"{BLUE}🧮 Scanning disks...{NC}")
+    for dev in get_all_block_devices():
+        process_drive(dev)
+
+    print_output()
+
 
 if __name__ == "__main__":
     import shutil
-    check_root()
-    print_header()
-    check_dependencies()
-    process_disks()
-    print_output()
+    main()
