@@ -105,10 +105,11 @@ def check_opencl():
 
     platforms = []
     for line in clinfo_out.splitlines():
-        if "Platform Name" in line:
-            parts = line.split(":", 1)
-            if len(parts) == 2:
-                platforms.append(parts[1].strip())
+        line = line.strip()
+        if line.startswith("Platform Name"):
+            name = line.split()[-1]
+            if name:
+                platforms.append(name)
     info(f"Found OpenCL platform(s): {', '.join(sorted(set(platforms))) or 'none'}")
 
     check_opencl_details(clinfo_out)
@@ -139,28 +140,34 @@ def detect_amd_gpu_vulkan_full():
             if current:
                 gpus.append(current)
                 current = {}
-            if "=" in line:
-                current["name"] = line.split("=", 1)[1].strip()
+            parts = line.split("=", 1)
+            if len(parts) == 2:
+                current["name"] = parts[1].strip()
 
         elif line.startswith("driverVersion"):
-            if "=" in line:
-                current["driver"] = line.split("=", 1)[1].strip()
+            parts = line.split("=", 1)
+            if len(parts) == 2:
+                current["driver"] = parts[1].strip()
 
         elif line.startswith("deviceUUID"):
-            if "=" in line:
-                current["uuid"] = line.split("=", 1)[1].strip()
+            parts = line.split("=", 1)
+            if len(parts) == 2:
+                current["uuid"] = parts[1].strip()
 
         elif line.startswith("deviceType"):
-            if "=" in line:
-                current["type"] = line.split("=", 1)[1].strip()
+            parts = line.split("=", 1)
+            if len(parts) == 2:
+                current["type"] = parts[1].strip()
 
         elif line.startswith("apiVersion"):
-            if "=" in line:
-                current["api"] = line.split("=", 1)[1].strip()
+            parts = line.split("=", 1)
+            if len(parts) == 2:
+                current["api"] = parts[1].strip()
 
         elif line.startswith("maxImageDimension2D"):
-            if "=" in line:
-                current["max2d"] = line.split("=", 1)[1].strip()
+            parts = line.split("=", 1)
+            if len(parts) == 2:
+                current["max2d"] = parts[1].strip()
 
     if current:
         gpus.append(current)
