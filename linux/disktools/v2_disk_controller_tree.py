@@ -105,6 +105,20 @@ def get_drive_temperature(device, dtype):
                     return f"🌡️ {temp.group(1)}°C,"
     return "🌡️ N/A,"
 
+def get_sata_speed_label(info_text):
+    match = re.search(r"SATA Version is:\s*([0-9.]+)", info_text)
+    if match:
+        speed = match.group(1)
+        if speed.startswith("6"):
+            return "SATA6"
+        elif speed.startswith("3"):
+            return "SATA3"
+        elif speed.startswith("1.5"):
+            return "SATA1"
+        else:
+            return f"SATA{speed.replace('.', '')}"
+    return "SATA"
+
 def color_link_speed(link):
     if re.match(r'(12|16|32|8)\.0', link):
         return f"{BOLD_GREEN}🧩 link={link}{NC}"
@@ -145,18 +159,18 @@ def process_sata_disks():
         temperature = get_drive_temperature(device, "sata")
 
         info = run(f"smartctl -i {device}")
-        protocol = ""
+        protocol = get_sata_speed_label(info)
+
         linkspeed = ""
         for line in info.splitlines():
-            if "SATA Version" in line:
-                protocol = line.split(":", 1)[-1].strip()
             if "current" in line.lower() and "Gb/s" in line:
-                linkspeed = re.search(r'([\d.]+ Gb/s)', line)
-                linkspeed = linkspeed.group(1) if linkspeed else ""
+                found = re.search(r'([\d.]+ Gb/s)', line)
+                if found:
+                    linkspeed = found.group(1)
         link_display = color_link_speed(linkspeed or "unknown")
 
         CONTROLLER_DISKS[controller].append(
-            f"{GREEN}💾 {device}{NC}  ({vendor} {model}, {size}, {protocol or 'unknown'}, "
+            f"{GREEN}💾 {device}{NC}  ({vendor} {model}, {size}, {protocol}, "
             f"{link_display}, {smart_health} {temperature} 🔢 SN: {serial}, 🔧 FW: {firmware})"
         )
 
@@ -185,7 +199,6 @@ def process_nvme_disks():
         serial = grep_val("SN")
         firmware = grep_val("FR")
         size = run(f"lsblk -dn -o SIZE {nvdev}")
-        crit_warn = run(f"nvme smart-log {nvdev}")
         crit_warn_val = grep_val("critical_warning")
         smart_health = format_smart_health(crit_warn_val)
         temperature = get_drive_temperature(nvdev, "nvme")
