@@ -2,7 +2,7 @@
 
 ## Wenn der Storage-Fehler zur Hölle wird...
 
-Wer regelmäßig mit Servern arbeitet, die eine Vielzahl an Festplatten und unterschiedlichen Storage-Controllern nutzen, kennt das Problem: Im Fehlerfall wird es schnell unübersichtlich. Plattenausfälle, Temperaturprobleme oder defekte Controller – und das alles quer verteilt über SATA, SAS und NVMe.
+Wer regelmäßig mit Servern arbeitet, die eine Vielzahl an Festplatten und unterschiedlichen Storage-Controllern nutzen, kennt das Problem: Im Fehlerfall wird es schnell unübersichtlich. Plattenausfälle, Temperaturprobleme, Firmwareversionen oder defekte Controller – und das alles quer verteilt über SATA, SAS und NVMe.
 
 Was bleibt? Manuell Informationen über Tools wie `lspci`, `lsblk`, `smartctl`, `nvme` und Co. zusammensuchen – mühsam, fehleranfällig und vor allem: zeitraubend.
 
@@ -78,11 +78,11 @@ Das Skript prüft beim Start automatisch, ob die folgenden Tools installiert sin
 
 ## 👤 Fazit
 
-Das „Disk-to-Controller Tree Visualizer“-Skript ist ein Segen für alle, die regelmäßig mit komplexer Storage-Hardware arbeiten – sei es im Rechenzentrum, im NAS oder im Workstation-Bereich. Statt sich durch unzählige Low-Level-Tools zu hangeln, bekommt man eine übersichtliche, detailreiche und sofort verwertbare Zusammenfassung.
+Das „Disk-to-Controller Tree Visualizer“-Skript ist ein Segen für alle, die mit komplexer oder gewachsener Storage-Hardware arbeiten – sei es im Rechenzentrum, im NAS oder im Workstation-Bereich. Statt sich durch unzählige Low-Level-Tools zu hangeln, bekommt man eine übersichtliche, detailreiche und sofort verwertbare Zusammenfassung.
 
 ### 🔧 Ideal für:
 
-* Admins mit vielen Disks und Controllern
+* Server mit vielen Disks und Controllern
 * Fehlersuche bei SMART-Warnungen
 * Performanceanalyse (z.B. Link-Speed-Fehler)
 * Hardware-Dokumentation & Audits
