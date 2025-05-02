@@ -128,6 +128,15 @@ def compact_model_name(vendor: str, model: str) -> str:
         return cleaned if cleaned else model
     return model
 
+def load_smart_json(device):
+    raw = run(f"smartctl -j -a {device}")
+    if not raw.strip():
+        raw = run(f"smartctl -j -a -d sat {device}")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
 # ── SATA Disk Handler (JSON-based) ──────────────────
 
 def process_sata_disks():
@@ -141,13 +150,8 @@ def process_sata_disks():
         devpath = f"/sys/block/{name}/device"
         controller = get_storage_controller(devpath)
 
-        smart_json_raw = run(f"smartctl -j -a {device}")
-        if not smart_json_raw.strip():
-            continue
-
-        try:
-            data = json.loads(smart_json_raw)
-        except json.JSONDecodeError:
+        data = load_smart_json(device)
+        if not data:
             continue
 
         vendor = data.get("model_family", "").strip()
@@ -188,5 +192,5 @@ if __name__ == "__main__":
     print_header()
     check_dependencies()
     process_sata_disks()
-    # NVMe support pending JSON integration
+    # NVMe support can be added similarly with JSON
     print_output()
