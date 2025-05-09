@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from collections import defaultdict
 
 # Terminal colors
@@ -33,6 +34,44 @@ def print_header():
 ║     SMART status, drive temperature, serial number, and firmware revision             ║
 ╚═══════════════════════════════════════════════════════════════════════════════════════╝{NC}
 """)
+
+import shutil
+import subprocess
+import sys
+
+
+def install_if_missing():
+    packages = ["smartctl", "nvme"]
+    package_mapping = {
+        "apt": {"smartctl": "smartmontools", "nvme": "nvme-cli"},
+        "dnf": {"smartctl": "smartmontools", "nvme": "nvme-cli"},
+        "yum": {"smartctl": "smartmontools", "nvme": "nvme-cli"},
+        "pacman": {"smartctl": "smartmontools", "nvme": "nvme-cli"},
+    }
+
+    pkg_mgr = None
+    for mgr in ["apt", "dnf", "yum", "pacman"]:
+        if shutil.which(mgr):
+            pkg_mgr = mgr
+            break
+
+    if not pkg_mgr:
+        print("⚠️ No supported package manager found (apt, dnf, yum, pacman) - continue anyway")
+        return
+
+    for cmd in packages:
+        if not shutil.which(cmd):
+            pkg_name = package_mapping[pkg_mgr][cmd]
+            print(f"{BLUE}🔍 {cmd} not found. Installing {pkg_name} with {pkg_mgr}...")
+            try:
+                if pkg_mgr in ["apt", "dnf", "yum"]:
+                    subprocess.check_call(["sudo", pkg_mgr, "install", "-y", pkg_name])
+                elif pkg_mgr == "pacman":
+                    subprocess.check_call(["sudo", "pacman", "-S", "--noconfirm", pkg_name])
+            except subprocess.CalledProcessError:
+                print(f"{RED}❌ Failed to install {pkg_name} using {pkg_mgr}.")
+                sys.exit(1)
+
 
 def check_dependencies():
     print(f"{BLUE}🔍 Checking dependencies...{NC}")
@@ -170,6 +209,7 @@ def main():
         print(f"{RED}❌ This script must be run as root.{NC}")
         exit(1)
     print_header()
+    install_if_missing()
     check_dependencies()
     process_sata_disks()
     process_nvme_disks()
