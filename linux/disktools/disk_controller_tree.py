@@ -27,10 +27,10 @@ def run(cmd):
 def print_header():
     print(f"""{BOLD_GREEN}
 ╔═══════════════════════════════════════════════════════════════════════════════════════╗
-║ 🧩  Disk-to-Controller Tree Visualizer                                                 ║
-║ 👤  Author : bitranox                                                                  ║
+║ 🧩  Disk-to-Controller Tree Visualizer                                                ║
+║ 👤  Author : bitranox                                                                 ║
 ║ 🏛️  License: MIT                                                                       ║
-║ 💾  Shows disks grouped by controller with model, size, interface, link speed,         ║
+║ 💾  Shows disks grouped by controller with model, size, interface, link speed,        ║
 ║     SMART status, drive temperature, serial number, and firmware revision             ║
 ╚═══════════════════════════════════════════════════════════════════════════════════════╝{NC}
 """)
