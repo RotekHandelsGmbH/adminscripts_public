@@ -81,6 +81,7 @@ def check_dependencies():
             exit(1)
 
 def get_storage_controller(devpath):
+    # devpath like : /sys/block/sda/device
     try:
         real_path = os.path.realpath(devpath)
         addresses = re.findall(r'([0-9a-f]{2}:[0-9a-f]{2}\.[0-9])', real_path)
