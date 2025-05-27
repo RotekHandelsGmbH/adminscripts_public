@@ -82,9 +82,20 @@ set_opt_flags() {
             ;;
         *)
             echo "❌ Optimization flags NOT set. You can still export them manually later."
-            export CFLAGS="-O3 -flto=auto -fno-semantic-interposition"
+            #1 - no flags
+
+            # optimal after chatgpt
+            export CFLAGS="-O3 -flto=auto -fno-semantic-interposition -fvisibility=hidden -march=native -mtune=native"
             export CXXFLAGS="$CFLAGS"
-            export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
+            export LDFLAGS="-flto=auto -fno-semantic-interposition -Wl,--as-needed -Wl,-O1"
+
+            # export CFLAGS="-O3 -flto=auto -fno-semantic-interposition"
+            # export CXXFLAGS="$CFLAGS"
+            # export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
+
+
+
+
             ;;
     esac
 }
