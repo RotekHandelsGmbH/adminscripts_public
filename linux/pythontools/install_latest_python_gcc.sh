@@ -82,6 +82,9 @@ set_opt_flags() {
             ;;
         *)
             echo "❌ Optimization flags NOT set. You can still export them manually later."
+            export CFLAGS="-O3 -flto=auto -fno-semantic-interposition"
+            export CXXFLAGS="$CFLAGS"
+            export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
             ;;
     esac
 }
