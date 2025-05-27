@@ -85,8 +85,9 @@ set_opt_flags() {
             #1 - no flags
 
             # optimal after chatgpt
-            export CFLAGS="-march=native -mtune=native"
+            export CFLAGS="-O3 -flto=auto -fno-semantic-interposition -fvisibility=hidden"
             export CXXFLAGS="$CFLAGS"
+            export LDFLAGS="-flto=auto -fno-semantic-interposition -Wl,--as-needed -Wl,-O1"
 
             # export CFLAGS="-O3 -flto=auto -fno-semantic-interposition"
             # export CXXFLAGS="$CFLAGS"
