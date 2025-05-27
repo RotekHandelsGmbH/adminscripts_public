@@ -87,6 +87,19 @@ After installation:
 - **Permissions**:
   - Run as root or with `sudo` to write to `/opt` and install packages.
 
+- **lto terminates**:
+    ```bash
+    gcc: fatal error: Killed signal terminated program as
+    ...
+    lto-wrapper: fatal error: gcc returned 1 exit status
+    ...
+    /usr/bin/ld: error: lto-wrapper failed
+    ```
+  indicates that the GCC compilation process was killed, likely due to insufficient memory (RAM) during Link Time Optimization (LTO).
+  What's happening:
+  GCC is performing LTO, which is memory-intensive.
+  Your system likely ran out of memory, and the OS killed the process (often with a SIGKILL).
+  This leads to the lto-wrapper failed and subsequent linker errors.
 ---
 
 This script streamlines Python installations on servers where package managers may lag behind upstream releases.
