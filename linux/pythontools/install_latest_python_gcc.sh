@@ -86,6 +86,7 @@ set_opt_flags() {
     esac
 }
 
+# === BUILD & INSTALL CPYTHON ===
 function install_prefix() {
   local PREFIX="$1"
   log "Installing into $PREFIX…"
@@ -100,30 +101,15 @@ function install_prefix() {
 
   ./configure \
     --prefix="$PREFIX" \
+    --enable-optimizations \
     --with-lto \
     --with-openssl=/usr \
     --with-system-zlib \
+    --enable-optimizations \
     || error "Configure failed for $PREFIX"
 
-  echo ""
-  read -p "❓ Do you want to build with Profile-Guided Optimization (PGO)? [y/N]: " pgo_answer
-  case "$pgo_answer" in
-      [yY][eE][sS]|[yY])
-          log "Starting instrumented PGO build…"
-          make -j"$(nproc)" profile-gen || error "Instrumented build (profile-gen) failed"
-          log "Installing pyperformance for profiling…"
-          ./python -m ensurepip
-          ./python -m pip install pyperformance
-          log "Running pyperformance to generate profile data…"
-          ./python -m pyperformance run --pgo || error "pyperformance profiling failed"
-          log "Building final optimized Python with PGO…"
-          make -j"$(nproc)" profile-use || error "Final PGO build failed"
-          ;;
-      *)
-          log "Building without PGO…"
-          make -j"$(nproc)" || error "Build failed for $PREFIX"
-          ;;
-  esac
+  log "Building (prefix=$PREFIX)…"
+  make -j"$(nproc)" || error "Build failed for $PREFIX"
 
   log "Altinstalling (prefix=$PREFIX)…"
   make altinstall || error "Altinstall failed for $PREFIX"
