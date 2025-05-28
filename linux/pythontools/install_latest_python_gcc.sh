@@ -85,17 +85,13 @@ set_opt_flags() {
             #1 - no flags
 
             # optimal after chatgpt
-            #export CFLAGS="-O3 -flto=auto -fno-semantic-interposition -fvisibility=hidden"
-            #export CXXFLAGS="$CFLAGS"
-            #export LDFLAGS="-flto=auto -fno-semantic-interposition -Wl,--as-needed -Wl,-O1"
-
+            export CFLAGS="-O3 -flto=auto -fno-semantic-interposition -fvisibility=hidden -march=native"
+            export CXXFLAGS="$CFLAGS"
+            export LDFLAGS="-flto=auto -fno-semantic-interposition -Wl,--as-needed -Wl,-O1, -fvisibility=hidden"
+            read -p "🔧 Custom flags set" dummy
             # export CFLAGS="-O3 -flto=auto -fno-semantic-interposition"
             # export CXXFLAGS="$CFLAGS"
             # export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
-
-
-
-
             ;;
     esac
 }
@@ -115,11 +111,12 @@ function install_prefix() {
 
   ./configure \
     --prefix="$PREFIX" \
-    --enable-optimizations \
     --with-lto \
     --with-openssl=/usr \
     --with-system-zlib \
     || error "Configure failed for $PREFIX"
+
+#     --enable-optimizations \
 
   log "Building (prefix=$PREFIX)…"
   make -j"$(nproc)" || error "Build failed for $PREFIX"
