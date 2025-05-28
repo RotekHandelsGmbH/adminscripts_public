@@ -65,35 +65,30 @@ function prepare_build() {
 
 # === SET OPT FLAGS ===
 set_opt_flags() {
-    echo "🔧 This will set HIGH-PERFORMANCE compiler and linker flags:"
+    echo "🔧 Set HIGH-PERFORMANCE compiler and linker flags - always check performance with pyperf - most of the time those flags degrade performance:"
     echo ""
-    echo "  CFLAGS    = -O3 -march=native -flto=auto -fno-semantic-interposition"
+    echo "  CFLAGS    = -O3 -flto=auto -fno-semantic-interposition -fvisibility=hidden -march=native"
     echo "  CXXFLAGS  = (same as CFLAGS)"
-    echo "  LDFLAGS   = -Wl,-O1 -Wl,--as-needed -flto=auto"
+    echo "  LDFLAGS   = -flto=auto -fno-semantic-interposition -Wl,--as-needed -Wl,-O1 -march=native"
     echo ""
     read -p "❓ Do you want to apply these flags for your build? You will be able to execute python only at this machines CPU (march=native) [y/N]: " answer
 
     case "$answer" in
         [yY][eE][sS]|[yY])
-            export CFLAGS="-O3 -march=native -flto=auto -fno-semantic-interposition"
-            export CXXFLAGS="$CFLAGS"
-            export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
-            echo "✅ Optimization flags set."
-            ;;
-        *)
-            # optimal after chatgpt
+            # export CFLAGS="-O3 -march=native -flto=auto -fno-semantic-interposition"
+            # export CXXFLAGS="$CFLAGS"
+            # export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
             export CFLAGS="-O3 -flto=auto -fno-semantic-interposition -fvisibility=hidden -march=native"
             export CXXFLAGS="${CFLAGS}"
             export LDFLAGS="-flto=auto -fno-semantic-interposition -Wl,--as-needed -Wl,-O1 -march=native"
-            log ""
-            # export CFLAGS="-O3 -flto=auto -fno-semantic-interposition"
-            # export CXXFLAGS="$CFLAGS"
-            # export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
+            echo "✅ Optimization flags set to: "
+            echo "🔧 CFLAGS  : ${CFLAGS}"
+            echo "🔧 LDFLAGS : ${LDFLAGS}"
             ;;
+        *)
+            echo "✅ No additional flags set"
+           ;;
     esac
-    echo "✅ Optimization flags set."
-    echo "🔧 CFLAGS : ${CFLAGS}"
-    echo "🔧 LDLAGS : ${LDFLAGS}"
     read -p "❓ Enter to continue" dummy
 }
 
