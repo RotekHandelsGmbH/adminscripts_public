@@ -81,19 +81,20 @@ set_opt_flags() {
             echo "✅ Optimization flags set."
             ;;
         *)
-            echo "❌ Optimization flags NOT set. You can still export them manually later."
-            #1 - no flags
-
             # optimal after chatgpt
             export CFLAGS="-O3 -flto=auto -fno-semantic-interposition -fvisibility=hidden -march=native"
-            export CXXFLAGS="$CFLAGS"
+            export CXXFLAGS="${CFLAGS}"
             export LDFLAGS="-flto=auto -fno-semantic-interposition -Wl,--as-needed -Wl,-O1"
-            read -p "🔧 Custom flags set" dummy
+            log ""
             # export CFLAGS="-O3 -flto=auto -fno-semantic-interposition"
             # export CXXFLAGS="$CFLAGS"
             # export LDFLAGS="-Wl,-O1 -Wl,--as-needed -flto=auto"
             ;;
     esac
+    echo "✅ Optimization flags set."
+    echo "🔧 CFLAGS : ${CFLAGS}"
+    echo "🔧 LDLAGS : ${LDFLAGS}"
+    read -p "❓ Enter to continue" dummy
 }
 
 # === BUILD & INSTALL CPYTHON ===
@@ -114,9 +115,8 @@ function install_prefix() {
     --with-lto \
     --with-openssl=/usr \
     --with-system-zlib \
+    --enable-optimizations \
     || error "Configure failed for $PREFIX"
-
-#     --enable-optimizations \
 
   log "Building (prefix=$PREFIX)…"
   make -j"$(nproc)" || error "Build failed for $PREFIX"
