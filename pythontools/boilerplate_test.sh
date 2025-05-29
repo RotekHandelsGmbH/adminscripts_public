@@ -5,3 +5,6 @@ source /usr/local/lib_bash/lib_bash.sh
 elevate "$@"
 update_caller "$@"
 log "OK"
+log_wrench "OK"
+log_ok "OK"
+log_success "OK"
