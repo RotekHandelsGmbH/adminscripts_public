@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+
 # === CONFIGURATION ===
 PYTHON_LATEST_DIR="/opt/python-latest"
 TMP_DIR="/tmp"
